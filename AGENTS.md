@@ -45,7 +45,7 @@ Install Lazarus (≥2.2.6) and FPC (≥3.2.2); most scripts assume `lazbuild` is
 
 - `docker run -it --rm -v "$(pwd)":/sh -w /sh peterdavehello/shfmt:3.4.0 shfmt -sr -i 2 -l -w -ci .` formats shell scripts like the Travis job.
 - `find . -type f -name "*.sh" -print0 | xargs -0 shellcheck` runs ShellCheck on all shell scripts.
-- `npx markdown-link-check README.md` validates README links after documentation edits.
+- `npx markdown-link-check README.md AGENTS.md` validates links in Markdown files after documentation edits.
 - `npx eclint check lang/ setup/ Makefile* *.txt` enforces `.editorconfig` on templated assets.
 - `doctoc --title "## Table of Contents" --github README.md` refreshes the README ToC; rerun until the diff is clean.
 
