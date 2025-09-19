@@ -2,7 +2,7 @@
 
 ## Dos and Don’ts
 
-- Do export `LAZARUS_DIR` before running `make` or `lazbuild`; builds fail when Lazarus is not discoverable.
+- Do ensure Lazarus is discoverable: set `LAZARUS_DIR` for `make`, or pass `--lazarusdir` to `lazbuild` as in our scripts.
 - Do keep `.pas` and `.lfm` changes synchronized through Lazarus; update `lang/transgui.template` plus locale files together.
 - Do run only the CI steps relevant to touched files, mirroring the commands in `.travis.yml`.
 - Don’t edit generated artifacts such as `Makefile` or commit outputs under `Release/`.
