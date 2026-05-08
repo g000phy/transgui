@@ -112,7 +112,7 @@ struct ContentView: View {
             }
         } message: {
             if let pendingRemoval = appModel.pendingRemoval {
-                Text(pendingRemoval.torrentName ?? "Selected torrent")
+                Text(pendingRemoval.message)
             }
         }
         .toolbar {

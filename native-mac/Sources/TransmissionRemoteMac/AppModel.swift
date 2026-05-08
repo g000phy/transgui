@@ -405,6 +405,7 @@ final class AppModel {
         }
 
         do {
+            try await rpcClient.stopTorrent(ids: ids)
             try await rpcClient.removeTorrent(ids: ids, deleteLocalData: deleteLocalData)
             if let selectedTorrentID, ids.contains(selectedTorrentID) {
                 self.selectedTorrentID = nil
@@ -589,6 +590,15 @@ struct TorrentRemovalRequest: Identifiable, Equatable {
 
     var actionTitle: String {
         deleteLocalData ? "Remove and delete data" : "Remove from list"
+    }
+
+    var message: String {
+        let name = torrentName ?? "Selected torrent"
+        if deleteLocalData {
+            return "\(name)\n\nTorrent and downloaded data will be removed."
+        }
+
+        return "\(name)\n\nDownloaded data will remain untouched in its folder."
     }
 }
 
