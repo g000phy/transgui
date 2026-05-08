@@ -84,6 +84,7 @@ public struct Torrent: Identifiable, Decodable, Equatable, Sendable {
     public let peersConnected: Int?
     public let bandwidthPriority: BandwidthPriority?
     public let trackerStats: [TrackerStats]?
+    public let peers: [TorrentPeer]?
     public let error: Int?
     public let errorString: String?
 
@@ -105,6 +106,7 @@ public struct Torrent: Identifiable, Decodable, Equatable, Sendable {
         peersConnected: Int? = nil,
         bandwidthPriority: BandwidthPriority? = nil,
         trackerStats: [TrackerStats]? = nil,
+        peers: [TorrentPeer]? = nil,
         error: Int?,
         errorString: String?
     ) {
@@ -121,15 +123,24 @@ public struct Torrent: Identifiable, Decodable, Equatable, Sendable {
         self.peersConnected = peersConnected
         self.bandwidthPriority = bandwidthPriority
         self.trackerStats = trackerStats
+        self.peers = peers
         self.error = error
         self.errorString = errorString
     }
 
     public var seedCount: Int? {
-        trackerStats?.compactMap(\.seederCount).filter { $0 >= 0 }.max()
+        if let peers {
+            return peers.filter { ($0.progress ?? 0) >= 1 }.count
+        }
+
+        return trackerStats?.compactMap(\.seederCount).filter { $0 >= 0 }.max()
     }
 
     public var peerCount: Int? {
+        if let peers {
+            return peers.count
+        }
+
         let trackerPeers = trackerStats?.compactMap(\.leecherCount).filter { $0 >= 0 }.max()
         return trackerPeers ?? peersConnected
     }
@@ -197,6 +208,7 @@ public enum TorrentField: String, Sendable {
         .peersConnected,
         .bandwidthPriority,
         .trackerStats,
+        .peers,
         .error,
         .errorString
     ]

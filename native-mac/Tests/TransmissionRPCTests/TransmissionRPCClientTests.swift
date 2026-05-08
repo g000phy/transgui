@@ -97,6 +97,18 @@ struct TransmissionRPCClientTests {
                             "leecherCount": 4
                           }
                         ],
+                        "peers": [
+                          {
+                            "address": "10.0.0.1",
+                            "port": 51413,
+                            "progress": 1
+                          },
+                          {
+                            "address": "10.0.0.2",
+                            "port": 51413,
+                            "progress": 0.65
+                          }
+                        ],
                         "error": 0,
                         "errorString": ""
                       }
@@ -114,14 +126,15 @@ struct TransmissionRPCClientTests {
         #expect(list.torrents.single?.status == .download)
         #expect(list.torrents.single?.leftUntilDone == 1024)
         #expect(list.torrents.single?.uploadRatio == 0.75)
-        #expect(list.torrents.single?.seedCount == 12)
-        #expect(list.torrents.single?.peerCount == 4)
+        #expect(list.torrents.single?.seedCount == 1)
+        #expect(list.torrents.single?.peerCount == 2)
         #expect(list.torrents.single?.bandwidthPriority == .high)
 
         let body = try #require(MockURLProtocol.requestBodies.single.flatMap { $0 })
         let request = try JSONDecoder().decode(TorrentGetRequest.self, from: body)
         #expect(request.arguments.fields.contains("leftUntilDone"))
         #expect(request.arguments.fields.contains("trackerStats"))
+        #expect(request.arguments.fields.contains("peers"))
         #expect(request.arguments.fields.contains("uploadRatio"))
         #expect(request.arguments.fields.contains("bandwidthPriority"))
     }
