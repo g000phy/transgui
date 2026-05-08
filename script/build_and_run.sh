@@ -5,7 +5,7 @@ MODE="${1:-run}"
 APP_NAME="TransmissionRemoteMac"
 BUNDLE_ID="com.g000phy.TransmissionRemoteMac"
 MIN_SYSTEM_VERSION="15.0"
-VERSION="0.1.1"
+VERSION="0.1.2"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SWIFT_DIR="$ROOT_DIR/native-mac"

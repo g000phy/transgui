@@ -60,6 +60,7 @@ struct ContentView: View {
             }
         }
         .searchable(text: $appModel.searchText, placement: .toolbar)
+        .background(WindowIconInstaller().frame(width: 0, height: 0))
         .sheet(isPresented: $appModel.isConnectionSettingsPresented) {
             ConnectionSettingsView(
                 draft: ConnectionDraft(

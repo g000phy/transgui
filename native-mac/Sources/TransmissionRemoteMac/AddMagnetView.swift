@@ -3,6 +3,7 @@ import SwiftUI
 struct AddMagnetView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
+    @State private var isSubmitting = false
 
     var body: some View {
         @Bindable var appModel = appModel
@@ -12,28 +13,15 @@ struct AddMagnetView: View {
                 Text("Magnet Link")
                     .font(.title3.weight(.semibold))
 
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(.quaternary.opacity(0.35))
-
-                    TextEditor(text: $appModel.magnetLinkDraft)
-                        .font(.body)
-                        .scrollContentBackground(.hidden)
-                        .textSelection(.enabled)
-                        .padding(8)
-                        .frame(minHeight: 112, maxHeight: 112)
-                        .onChange(of: appModel.magnetLinkDraft) {
-                            appModel.addMagnetErrorMessage = nil
-                        }
-
-                    if appModel.magnetLinkDraft.isEmpty {
-                        Text("Paste link")
-                            .foregroundStyle(.tertiary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 16)
-                            .allowsHitTesting(false)
+                TextField("Paste link", text: $appModel.magnetLinkDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1)
+                    .onSubmit {
+                        submit()
                     }
-                }
+                    .onChange(of: appModel.magnetLinkDraft) {
+                        appModel.addMagnetErrorMessage = nil
+                    }
 
                 if let message = appModel.addMagnetErrorMessage {
                     Label(message, systemImage: "exclamationmark.triangle")
@@ -55,23 +43,33 @@ struct AddMagnetView: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button {
-                    Task {
-                        let didAdd = await appModel.addMagnetLink()
-                        if didAdd {
-                            dismiss()
-                        }
-                    }
+                    submit()
                 } label: {
                     Label("Add", systemImage: "plus")
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(appModel.magnetLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(appModel.magnetLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
             }
             .padding()
         }
-        .frame(width: 620, height: 280)
+        .frame(width: 620, height: 180)
         .onAppear {
             appModel.addMagnetErrorMessage = nil
+        }
+    }
+
+    private func submit() {
+        guard !isSubmitting else {
+            return
+        }
+
+        isSubmitting = true
+        Task {
+            let didAdd = await appModel.addMagnetLink()
+            isSubmitting = false
+            if didAdd {
+                dismiss()
+            }
         }
     }
 }

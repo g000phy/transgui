@@ -1,6 +1,8 @@
+import AppKit
 import Foundation
 import Observation
 import TransmissionRPC
+import UserNotifications
 
 @MainActor
 @Observable
@@ -28,18 +30,23 @@ final class AppModel {
         altUploadLimitKBps: 50,
         isAltSpeedEnabled: false
     )
+    private var knownCompletedTorrentIDs: Set<Torrent.ID> = []
 
     private var rpcClient: TransmissionRPCClient?
     private let profileStore: ConnectionProfileStore
     private let credentialStore: KeychainCredentialStore
+    private let notificationCenter: UNUserNotificationCenter
 
     init(
         profileStore: ConnectionProfileStore = .live,
-        credentialStore: KeychainCredentialStore = .live
+        credentialStore: KeychainCredentialStore = .live,
+        notificationCenter: UNUserNotificationCenter = .current()
     ) {
         self.profileStore = profileStore
         self.credentialStore = credentialStore
+        self.notificationCenter = notificationCenter
         self.connectionProfile = profileStore.load()
+        requestNotificationPermission()
     }
 
     var visibleTorrents: [Torrent] {
@@ -133,6 +140,7 @@ final class AppModel {
             rpcClient = client
             speedLimits = SpeedLimits(session: session)
             torrents = torrentList.torrents
+            knownCompletedTorrentIDs = Set(torrents.filter(\.isFinished).map(\.id))
             selectedTorrentDetails = nil
             selectedTorrentID = torrents.first?.id
             connectionState = .connected(serverName: session.version ?? rpcURL.host ?? "Transmission")
@@ -152,7 +160,9 @@ final class AppModel {
         }
 
         do {
-            torrents = try await rpcClient.torrentGet().torrents
+            let refreshedTorrents = try await rpcClient.torrentGet().torrents
+            notifyCompletedTorrentsIfNeeded(refreshedTorrents)
+            torrents = refreshedTorrents
             if let selectedTorrentID, !torrents.contains(where: { $0.id == selectedTorrentID }) {
                 self.selectedTorrentID = torrents.first?.id
             }
@@ -311,13 +321,13 @@ final class AppModel {
             return false
         }
 
-        guard MagnetLinkValidator.isValid(magnetLink) else {
+        guard let normalizedMagnetLink = MagnetLinkValidator.normalized(magnetLink) else {
             addMagnetErrorMessage = "Link not recognized. Check the link."
             return false
         }
 
         do {
-            _ = try await rpcClient.addMagnet(magnetLink)
+            _ = try await rpcClient.addMagnet(normalizedMagnetLink)
             magnetLinkDraft = ""
             isAddTorrentPresented = false
             await refreshTorrents()
@@ -452,6 +462,43 @@ final class AppModel {
             connectionState = .failed(message: error.localizedDescription)
         }
     }
+
+    private func notifyCompletedTorrentsIfNeeded(_ refreshedTorrents: [Torrent]) {
+        let completedTorrents = refreshedTorrents.filter(\.isFinished)
+        let completedIDs = Set(completedTorrents.map(\.id))
+        defer { knownCompletedTorrentIDs = completedIDs }
+
+        guard NSApplication.shared.isActive == false else {
+            return
+        }
+
+        let newlyCompletedTorrents = completedTorrents.filter { torrent in
+            !knownCompletedTorrentIDs.contains(torrent.id)
+        }
+
+        for torrent in newlyCompletedTorrents {
+            sendCompletionNotification(for: torrent)
+        }
+    }
+
+    private func requestNotificationPermission() {
+        notificationCenter.requestAuthorization(options: [.alert, .sound]) { _, _ in
+        }
+    }
+
+    private func sendCompletionNotification(for torrent: Torrent) {
+        let content = UNMutableNotificationContent()
+        content.title = "Download Complete"
+        content.body = torrent.name
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "torrent-completed-\(torrent.id)-\(Int(Date().timeIntervalSince1970))",
+            content: content,
+            trigger: nil
+        )
+        notificationCenter.add(request)
+    }
 }
 
 enum ConnectionState: Equatable {
@@ -462,23 +509,71 @@ enum ConnectionState: Equatable {
 }
 
 enum MagnetLinkValidator {
-    static func isValid(_ rawValue: String) -> Bool {
+    static func normalized(_ rawValue: String) -> String? {
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let collapsedValue = trimmedValue
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .joined()
+
+        let candidates = [
+            collapsedValue,
+            "magnet:?\(collapsedValue.trimmingPrefix("?"))",
+            "magnet:?xt=urn:btih:\(collapsedValue)"
+        ]
+
+        for candidate in candidates where isValid(candidate) {
+            return candidate
+        }
+
+        return nil
+    }
+
+    private static func isValid(_ rawValue: String) -> Bool {
         guard
             let components = URLComponents(string: rawValue),
             components.scheme?.localizedCaseInsensitiveCompare("magnet") == .orderedSame,
-            let queryItems = components.queryItems,
-            queryItems.contains(where: { item in
-                item.name.localizedCaseInsensitiveCompare("xt") == .orderedSame
-                    && (
-                        item.value?.localizedCaseInsensitiveContains("urn:btih:") == true
-                            || item.value?.localizedCaseInsensitiveContains("urn:btmh:") == true
-                    )
-            })
+            let queryItems = components.queryItems
         else {
             return false
         }
 
-        return true
+        return queryItems.contains { item in
+            item.name.localizedCaseInsensitiveCompare("xt") == .orderedSame
+                && item.value.map(isValidExactTopic) == true
+        }
+    }
+
+    private static func isValidExactTopic(_ value: String) -> Bool {
+        let lowercasedValue = value.lowercased()
+
+        if lowercasedValue.hasPrefix("urn:btih:") {
+            let hash = String(lowercasedValue.dropFirst("urn:btih:".count))
+            return isHex(hash, length: 40) || isBase32(hash, length: 32)
+        }
+
+        if lowercasedValue.hasPrefix("urn:btmh:") {
+            let hash = String(lowercasedValue.dropFirst("urn:btmh:".count))
+            return hash.count >= 68 && hash.allSatisfy(\.isHexDigit)
+        }
+
+        return false
+    }
+
+    private static func isHex(_ value: String, length: Int) -> Bool {
+        value.count == length && value.allSatisfy(\.isHexDigit)
+    }
+
+    private static func isBase32(_ value: String, length: Int) -> Bool {
+        let alphabet = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz234567")
+        return value.count == length
+            && value.unicodeScalars.allSatisfy { alphabet.contains($0) }
+    }
+}
+
+private extension String {
+    func trimmingPrefix(_ prefix: String) -> String {
+        hasPrefix(prefix) ? String(dropFirst(prefix.count)) : self
     }
 }
 

@@ -23,16 +23,21 @@ struct TransmissionRemoteMacApp: App {
     }
 }
 
-private enum AppIcon {
+enum AppIcon {
+    static var image: NSImage? {
+        guard let iconURL = Bundle.main.url(forResource: "TransmissionRemoteMac", withExtension: "icns") else {
+            return nil
+        }
+
+        return NSImage(contentsOf: iconURL)
+    }
+
     @MainActor
     static func install() {
-        guard
-            let iconURL = Bundle.main.url(forResource: "TransmissionRemoteMac", withExtension: "icns"),
-            let icon = NSImage(contentsOf: iconURL)
-        else {
+        guard let image else {
             return
         }
 
-        NSApplication.shared.applicationIconImage = icon
+        NSApplication.shared.applicationIconImage = image
     }
 }
