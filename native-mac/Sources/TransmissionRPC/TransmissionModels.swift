@@ -75,16 +75,32 @@ public enum TorrentStatus: Int, Decodable, Equatable, Sendable {
 }
 
 public enum TorrentField: String, Sendable {
+    case activityDate
+    case addedDate
+    case dateCreated
+    case downloadDir
+    case downloadedEver
+    case files
+    case fileStats
     case id
+    case leftUntilDone
     case name
+    case peers
+    case peersConnected
+    case peersGettingFromUs
+    case peersSendingToUs
     case status
     case percentDone
+    case secondsDownloading
+    case secondsSeeding
+    case trackerStats
     case totalSize
     case rateDownload
     case rateUpload
     case eta
     case error
     case errorString
+    case uploadedEver
 
     public static let defaultListFields: [TorrentField] = [
         .id,
@@ -98,6 +114,142 @@ public enum TorrentField: String, Sendable {
         .error,
         .errorString
     ]
+
+    public static let detailFields: [TorrentField] = [
+        .id,
+        .name,
+        .status,
+        .percentDone,
+        .totalSize,
+        .downloadDir,
+        .downloadedEver,
+        .uploadedEver,
+        .leftUntilDone,
+        .rateDownload,
+        .rateUpload,
+        .eta,
+        .error,
+        .errorString,
+        .activityDate,
+        .addedDate,
+        .dateCreated,
+        .secondsDownloading,
+        .secondsSeeding,
+        .peersConnected,
+        .peersGettingFromUs,
+        .peersSendingToUs,
+        .files,
+        .fileStats,
+        .trackerStats,
+        .peers
+    ]
+}
+
+public struct TorrentDetailsList: Decodable, Equatable, Sendable {
+    public let torrents: [TorrentDetails]
+}
+
+public struct TorrentDetails: Identifiable, Decodable, Equatable, Sendable {
+    public let id: Int
+    public let name: String
+    public let status: TorrentStatus
+    public let percentDone: Double
+    public let totalSize: Int64
+    public let downloadDir: String?
+    public let downloadedEver: Int64?
+    public let uploadedEver: Int64?
+    public let leftUntilDone: Int64?
+    public let rateDownload: Int64
+    public let rateUpload: Int64
+    public let eta: Int?
+    public let error: Int?
+    public let errorString: String?
+    public let activityDate: Int?
+    public let addedDate: Int?
+    public let dateCreated: Int?
+    public let secondsDownloading: Int?
+    public let secondsSeeding: Int?
+    public let peersConnected: Int?
+    public let peersGettingFromUs: Int?
+    public let peersSendingToUs: Int?
+    public let files: [TorrentFile]
+    public let fileStats: [TorrentFileStats]
+    public let trackerStats: [TrackerStats]
+    public let peers: [TorrentPeer]
+
+    public var filesWithStats: [TorrentFileWithStats] {
+        files.enumerated().map { index, file in
+            TorrentFileWithStats(
+                id: index,
+                file: file,
+                stats: fileStats.indices.contains(index) ? fileStats[index] : nil
+            )
+        }
+    }
+}
+
+public struct TorrentFile: Decodable, Equatable, Sendable {
+    public let name: String
+    public let length: Int64
+    public let bytesCompleted: Int64
+}
+
+public struct TorrentFileStats: Decodable, Equatable, Sendable {
+    public let bytesCompleted: Int64
+    public let wanted: Bool
+    public let priority: Int
+}
+
+public struct TorrentFileWithStats: Identifiable, Equatable, Sendable {
+    public let id: Int
+    public let file: TorrentFile
+    public let stats: TorrentFileStats?
+
+    public var progress: Double {
+        guard file.length > 0 else {
+            return 1
+        }
+        let completed = stats?.bytesCompleted ?? file.bytesCompleted
+        return min(max(Double(completed) / Double(file.length), 0), 1)
+    }
+}
+
+public struct TrackerStats: Identifiable, Decodable, Equatable, Sendable {
+    public let id: Int
+    public let host: String?
+    public let announce: String?
+    public let scrape: String?
+    public let lastAnnounceResult: String?
+    public let lastAnnounceSucceeded: Bool?
+    public let lastAnnounceTimedOut: Bool?
+    public let nextAnnounceTime: Int?
+    public let seederCount: Int?
+    public let leecherCount: Int?
+    public let downloadCount: Int?
+}
+
+public struct TorrentPeer: Identifiable, Decodable, Equatable, Sendable {
+    public var id: String {
+        "\(address):\(port ?? -1)"
+    }
+
+    public let address: String
+    public let port: Int?
+    public let clientName: String?
+    public let flagStr: String?
+    public let progress: Double?
+    public let rateToClient: Int64?
+    public let rateToPeer: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case address
+        case port
+        case clientName = "clientName"
+        case flagStr
+        case progress
+        case rateToClient
+        case rateToPeer
+    }
 }
 
 public struct TorrentAddResult: Decodable, Equatable, Sendable {

@@ -48,6 +48,13 @@ public final class TransmissionRPCClient: Sendable {
         try await call(method: "torrent-get", arguments: TorrentGetArguments(fields: fields.map(\.rawValue)))
     }
 
+    public func torrentDetails(id: Int) async throws -> TorrentDetails? {
+        let fields = TorrentField.detailFields.map(\.rawValue)
+        let arguments = TorrentGetArguments(fields: fields, ids: [id])
+        let list: TorrentDetailsList = try await call(method: "torrent-get", arguments: arguments)
+        return list.torrents.first
+    }
+
     public func startTorrent(ids: [Int]) async throws {
         let _: EmptyArguments = try await call(method: "torrent-start", arguments: TorrentIDs(ids: ids))
     }
@@ -63,6 +70,14 @@ public final class TransmissionRPCClient: Sendable {
 
     public func addMagnet(_ magnetLink: String, downloadDirectory: String? = nil) async throws -> TorrentAddResult {
         let arguments = TorrentAddArguments(filename: magnetLink, downloadDirectory: downloadDirectory)
+        return try await call(method: "torrent-add", arguments: arguments)
+    }
+
+    public func addTorrentFile(data: Data, downloadDirectory: String? = nil) async throws -> TorrentAddResult {
+        let arguments = TorrentAddArguments(
+            metainfo: data.base64EncodedString(),
+            downloadDirectory: downloadDirectory
+        )
         return try await call(method: "torrent-add", arguments: arguments)
     }
 
@@ -161,6 +176,7 @@ private struct TorrentIDs: Encodable {
 
 private struct TorrentGetArguments: Encodable {
     let fields: [String]
+    var ids: [Int]? = nil
 }
 
 private struct TorrentRemoveArguments: Encodable {
@@ -174,11 +190,13 @@ private struct TorrentRemoveArguments: Encodable {
 }
 
 private struct TorrentAddArguments: Encodable {
-    let filename: String
+    var filename: String? = nil
+    var metainfo: String? = nil
     let downloadDirectory: String?
 
     enum CodingKeys: String, CodingKey {
         case filename
+        case metainfo
         case downloadDirectory = "download-dir"
     }
 }

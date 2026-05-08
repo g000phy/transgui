@@ -15,6 +15,8 @@ final class AppModel {
     var isRemoveConfirmationPresented = false
     var magnetLinkDraft = ""
     var torrents: [Torrent] = Torrent.previewData
+    var selectedTorrentDetails: TorrentDetails?
+    var isLoadingTorrentDetails = false
 
     private var rpcClient: TransmissionRPCClient?
     private let profileStore: ConnectionProfileStore
@@ -44,6 +46,10 @@ final class AppModel {
         rpcClient != nil && selectedTorrentID != nil
     }
 
+    var hasSavedConnection: Bool {
+        connectionProfile != .empty
+    }
+
     var isConnected: Bool {
         if case .connected = connectionState {
             return true
@@ -52,7 +58,36 @@ final class AppModel {
     }
 
     func savedPassword() -> String {
-        (try? credentialStore.password(for: connectionProfile.keychainAccount)) ?? ""
+        guard !connectionProfile.username.isEmpty else {
+            return ""
+        }
+
+        return (try? credentialStore.password(for: connectionProfile.keychainAccount)) ?? ""
+    }
+
+    func connectToSavedProfileIfAvailable() async {
+        guard hasSavedConnection, !isConnected else {
+            return
+        }
+
+        await connect(
+            using: ConnectionDraft(
+                profile: connectionProfile,
+                password: savedPassword()
+            )
+        )
+    }
+
+    func runAutoRefreshLoop() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(5))
+
+            guard isConnected else {
+                continue
+            }
+
+            await refreshTorrents(presentConnectionSettings: false)
+        }
     }
 
     func connect(using draft: ConnectionDraft) async {
@@ -71,7 +106,9 @@ final class AppModel {
 
         do {
             try profileStore.save(profile)
-            try credentialStore.savePassword(draft.password, for: profile.keychainAccount)
+            if !profile.username.isEmpty || !draft.password.isEmpty {
+                try credentialStore.savePassword(draft.password, for: profile.keychainAccount)
+            }
 
             let server = TransmissionServer(
                 rpcURL: rpcURL,
@@ -84,21 +121,46 @@ final class AppModel {
 
             rpcClient = client
             torrents = torrentList.torrents
+            selectedTorrentDetails = nil
+            selectedTorrentID = torrents.first?.id
             connectionState = .connected(serverName: session.version ?? rpcURL.host ?? "Transmission")
+            await loadSelectedTorrentDetails()
         } catch {
             rpcClient = nil
             connectionState = .failed(message: error.localizedDescription)
         }
     }
 
-    func refreshTorrents() async {
+    func refreshTorrents(presentConnectionSettings: Bool = true) async {
         guard let rpcClient else {
-            isConnectionSettingsPresented = true
+            if presentConnectionSettings {
+                isConnectionSettingsPresented = true
+            }
             return
         }
 
         do {
             torrents = try await rpcClient.torrentGet().torrents
+            if let selectedTorrentID, !torrents.contains(where: { $0.id == selectedTorrentID }) {
+                self.selectedTorrentID = torrents.first?.id
+            }
+            await loadSelectedTorrentDetails()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func loadSelectedTorrentDetails() async {
+        guard let selectedTorrentID, let rpcClient else {
+            selectedTorrentDetails = nil
+            return
+        }
+
+        isLoadingTorrentDetails = true
+        defer { isLoadingTorrentDetails = false }
+
+        do {
+            selectedTorrentDetails = try await rpcClient.torrentDetails(id: selectedTorrentID)
         } catch {
             connectionState = .failed(message: error.localizedDescription)
         }
@@ -145,6 +207,28 @@ final class AppModel {
             _ = try await rpcClient.addMagnet(magnetLink)
             magnetLinkDraft = ""
             isAddTorrentPresented = false
+            await refreshTorrents()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func addTorrentFile(at url: URL) async {
+        guard let rpcClient else {
+            isConnectionSettingsPresented = true
+            return
+        }
+
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            _ = try await rpcClient.addTorrentFile(data: data)
             await refreshTorrents()
         } catch {
             connectionState = .failed(message: error.localizedDescription)

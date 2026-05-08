@@ -1,9 +1,11 @@
 import SwiftUI
 import TransmissionRPC
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(AppModel.self) private var appModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var isTorrentFileImporterPresented = false
 
     var body: some View {
         @Bindable var appModel = appModel
@@ -26,8 +28,19 @@ struct ContentView: View {
             .navigationTitle(appModel.selectedFilter.title)
             .navigationSplitViewColumnWidth(min: 520, ideal: 640, max: 760)
         } detail: {
-            TorrentInspector(torrent: appModel.selectedTorrent)
+            TorrentInspector(
+                torrent: appModel.selectedTorrent,
+                details: appModel.selectedTorrentDetails,
+                isLoading: appModel.isLoadingTorrentDetails
+            )
                 .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 560)
+        }
+        .task(id: appModel.selectedTorrentID) {
+            await appModel.loadSelectedTorrentDetails()
+        }
+        .task {
+            await appModel.connectToSavedProfileIfAvailable()
+            await appModel.runAutoRefreshLoop()
         }
         .searchable(text: $appModel.searchText, placement: .toolbar)
         .sheet(isPresented: $appModel.isConnectionSettingsPresented) {
@@ -42,6 +55,17 @@ struct ContentView: View {
         .sheet(isPresented: $appModel.isAddTorrentPresented) {
             AddMagnetView()
                 .environment(appModel)
+        }
+        .fileImporter(
+            isPresented: $isTorrentFileImporterPresented,
+            allowedContentTypes: [.torrentFile],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                Task {
+                    await appModel.addTorrentFile(at: url)
+                }
+            }
         }
         .confirmationDialog(
             "Remove Torrent",
@@ -81,11 +105,22 @@ struct ContentView: View {
                 }
                 .help("Refresh torrent list")
 
-                Button {
-                    appModel.isAddTorrentPresented = true
+                Menu {
+                    Button {
+                        appModel.isAddTorrentPresented = true
+                    } label: {
+                        Label("Magnet Link", systemImage: "link")
+                    }
+
+                    Button {
+                        isTorrentFileImporterPresented = true
+                    } label: {
+                        Label("Torrent File", systemImage: "doc.badge.plus")
+                    }
                 } label: {
                     Label("Add", systemImage: "plus")
                 }
+                .menuStyle(.button)
                 .help("Add magnet link or torrent file")
                 .disabled(!appModel.isConnected)
 
@@ -145,4 +180,8 @@ private struct ConnectionStatusView: View {
 #Preview {
     ContentView()
         .environment(AppModel())
+}
+
+private extension UTType {
+    static let torrentFile = UTType(filenameExtension: "torrent") ?? .data
 }

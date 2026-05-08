@@ -102,12 +102,135 @@ struct TransmissionRPCClientTests {
         #expect(list.torrents.single?.status == .download)
     }
 
+    @Test
+    func decodesTorrentDetails() async throws {
+        MockURLProtocol.responses = [
+            MockResponse(
+                statusCode: 200,
+                headers: [:],
+                body: """
+                {
+                  "result": "success",
+                  "arguments": {
+                    "torrents": [
+                      {
+                        "id": 7,
+                        "name": "Example",
+                        "status": 6,
+                        "percentDone": 1,
+                        "totalSize": 2048,
+                        "downloadDir": "/downloads",
+                        "downloadedEver": 2048,
+                        "uploadedEver": 4096,
+                        "leftUntilDone": 0,
+                        "rateDownload": 0,
+                        "rateUpload": 128,
+                        "eta": -1,
+                        "error": 0,
+                        "errorString": "",
+                        "activityDate": 1800000000,
+                        "addedDate": 1799999900,
+                        "dateCreated": 1799999800,
+                        "secondsDownloading": 10,
+                        "secondsSeeding": 20,
+                        "peersConnected": 1,
+                        "peersGettingFromUs": 0,
+                        "peersSendingToUs": 1,
+                        "files": [
+                          {
+                            "name": "example.bin",
+                            "length": 2048,
+                            "bytesCompleted": 2048
+                          }
+                        ],
+                        "fileStats": [
+                          {
+                            "bytesCompleted": 2048,
+                            "wanted": true,
+                            "priority": 0
+                          }
+                        ],
+                        "trackerStats": [
+                          {
+                            "id": 1,
+                            "host": "tracker.example",
+                            "announce": "https://tracker.example/announce",
+                            "scrape": "https://tracker.example/scrape",
+                            "lastAnnounceResult": "Success",
+                            "lastAnnounceSucceeded": true,
+                            "lastAnnounceTimedOut": false,
+                            "nextAnnounceTime": 1800001000,
+                            "seederCount": 12,
+                            "leecherCount": 3,
+                            "downloadCount": 4
+                          }
+                        ],
+                        "peers": [
+                          {
+                            "address": "10.0.0.1",
+                            "port": 51413,
+                            "clientName": "Transmission",
+                            "flagStr": "DX",
+                            "progress": 1,
+                            "rateToClient": 0,
+                            "rateToPeer": 128
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+                """.data(using: .utf8)!
+            )
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        let details = try await client.torrentDetails(id: 7)
+
+        #expect(details?.downloadDir == "/downloads")
+        #expect(details?.filesWithStats.single?.progress == 1)
+        #expect(details?.trackerStats.single?.host == "tracker.example")
+        #expect(details?.peers.single?.address == "10.0.0.1")
+    }
+
+    @Test
+    func sendsTorrentFileAsMetainfo() async throws {
+        MockURLProtocol.responses = [
+            MockResponse(
+                statusCode: 200,
+                headers: [:],
+                body: """
+                {
+                  "result": "success",
+                  "arguments": {
+                    "torrent-added": {
+                      "id": 9,
+                      "name": "Example",
+                      "hashString": "abc"
+                    }
+                  }
+                }
+                """.data(using: .utf8)!
+            )
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        _ = try await client.addTorrentFile(data: Data("torrent bytes".utf8))
+
+        let body = try #require(MockURLProtocol.requestBodies.single.flatMap { $0 })
+        let request = try JSONDecoder().decode(TorrentAddRequest.self, from: body)
+        #expect(request.method == "torrent-add")
+        #expect(request.arguments.metainfo == Data("torrent bytes".utf8).base64EncodedString())
+        #expect(request.arguments.filename == nil)
+    }
+
     private var server: TransmissionServer {
         TransmissionServer(rpcURL: URL(string: "http://example.test/transmission/rpc")!)
     }
 
     private var mockSession: URLSession {
         MockURLProtocol.requests = []
+        MockURLProtocol.requestBodies = []
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
@@ -117,6 +240,7 @@ struct TransmissionRPCClientTests {
 private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var responses: [MockResponse] = []
     nonisolated(unsafe) static var requests: [URLRequest] = []
+    nonisolated(unsafe) static var requestBodies: [Data?] = []
 
     override class func canInit(with request: URLRequest) -> Bool {
         true
@@ -128,6 +252,7 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         Self.requests.append(request)
+        Self.requestBodies.append(request.bodyData)
         let response = Self.responses.removeFirst()
         let httpResponse = HTTPURLResponse(
             url: request.url!,
@@ -144,10 +269,51 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 }
 
+private extension URLRequest {
+    var bodyData: Data? {
+        if let httpBody {
+            return httpBody
+        }
+
+        guard let httpBodyStream else {
+            return nil
+        }
+
+        httpBodyStream.open()
+        defer { httpBodyStream.close() }
+
+        var data = Data()
+        let bufferSize = 1_024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while httpBodyStream.hasBytesAvailable {
+            let readCount = httpBodyStream.read(buffer, maxLength: bufferSize)
+            if readCount > 0 {
+                data.append(buffer, count: readCount)
+            } else {
+                break
+            }
+        }
+
+        return data
+    }
+}
+
 private struct MockResponse {
     let statusCode: Int
     let headers: [String: String]
     let body: Data
+}
+
+private struct TorrentAddRequest: Decodable {
+    let method: String
+    let arguments: Arguments
+
+    struct Arguments: Decodable {
+        let filename: String?
+        let metainfo: String?
+    }
 }
 
 private extension Collection {

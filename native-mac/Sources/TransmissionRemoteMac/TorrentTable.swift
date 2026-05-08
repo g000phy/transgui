@@ -45,7 +45,7 @@ struct TorrentTable: View {
     }
 }
 
-private extension TorrentStatus {
+extension TorrentStatus {
     var displayName: String {
         switch self {
         case .stopped:
