@@ -2,6 +2,9 @@ import SwiftUI
 import TransmissionRPC
 
 struct TorrentTable: View {
+    @AppStorage(TorrentTableColumnPreferences.storageKey)
+    private var encodedColumnPreferences = TorrentTableColumnPreferences.defaultValue.encoded
+
     let torrents: [Torrent]
     @Binding var selectedTorrentID: Torrent.ID?
     let canRunTorrentCommand: Bool
@@ -15,96 +18,20 @@ struct TorrentTable: View {
 
     var body: some View {
         Table(torrents, selection: $selectedTorrentID) {
-            TableColumn("Name") { torrent in
-                Text(torrent.name)
-                    .lineLimit(1)
-            }
-            .width(min: 160, ideal: 260, max: .infinity)
-
-            TableColumn("Progress") { torrent in
-                ProgressView(value: torrent.percentDone)
-                    .controlSize(.small)
-            }
-            .width(min: 80, ideal: 120, max: .infinity)
-
-            TableColumn("Size") { torrent in
-                Text(ByteFormat.compactFileSize(torrent.totalSize))
-                    .monospacedDigit()
-            }
-            .width(min: 60, ideal: 64, max: 120)
-
-            TableColumn("Size left") { torrent in
-                Text(ByteFormat.compactFileSize(torrent.leftUntilDone))
-                    .monospacedDigit()
-            }
-            .width(min: 68, ideal: 72, max: 130)
-
-            TableColumn("Status") { torrent in
-                Text(torrent.status.displayName)
-                    .foregroundStyle(torrent.status == .unknown ? .secondary : .primary)
-                    .lineLimit(1)
-            }
-            .width(min: 80, ideal: 90, max: .infinity)
-
-            TableColumn("Seeds") { torrent in
-                Text(count(torrent.seedCount))
-                    .monospacedDigit()
-            }
-            .width(min: 45, ideal: 50, max: 90)
-
-            TableColumn("Peers") { torrent in
-                Text(count(torrent.peerCount))
-                    .monospacedDigit()
-            }
-            .width(min: 45, ideal: 50, max: 90)
+            tableColumn(at: 0)
+            tableColumn(at: 1)
+            tableColumn(at: 2)
+            tableColumn(at: 3)
+            tableColumn(at: 4)
+            tableColumn(at: 5)
+            tableColumn(at: 6)
 
             Group {
-                TableColumn("Down speed") { (torrent: Torrent) in
-                    Text(ByteFormat.compactTransferRate(torrent.rateDownload))
-                        .monospacedDigit()
-                }
-                .width(min: 72, ideal: 78, max: .infinity)
-
-                TableColumn("Up speed") { (torrent: Torrent) in
-                    Text(ByteFormat.compactTransferRate(torrent.rateUpload))
-                        .monospacedDigit()
-                }
-                .width(min: 70, ideal: 74, max: .infinity)
-
-                TableColumn("ETA") { (torrent: Torrent) in
-                    Text(eta(torrent))
-                        .monospacedDigit()
-                }
-                .width(min: 56, ideal: 60, max: 120)
-
-                TableColumn("Ratio") { (torrent: Torrent) in
-                    Text(ratio(torrent.uploadRatio))
-                        .monospacedDigit()
-                        .foregroundStyle(ratioColor(torrent.uploadRatio))
-                }
-                .width(min: 52, ideal: 56, max: 100)
-
-                TableColumn("Priority") { (torrent: Torrent) in
-                    Menu {
-                        ForEach(BandwidthPriority.allCases) { priority in
-                            Button {
-                                setPriority(torrent.id, priority)
-                            } label: {
-                                if torrent.bandwidthPriority == priority {
-                                    Label(priority.title, systemImage: "checkmark")
-                                } else {
-                                    Text(priority.title)
-                                }
-                            }
-                        }
-                    } label: {
-                        Text(torrent.bandwidthPriority?.title ?? "Normal")
-                    }
-                    .menuStyle(.button)
-                    .controlSize(.small)
-                    .disabled(!canRunTorrentCommand)
-                }
-                .width(min: 80, ideal: 84, max: 150)
+                tableColumn(at: 7)
+                tableColumn(at: 8)
+                tableColumn(at: 9)
+                tableColumn(at: 10)
+                tableColumn(at: 11)
             }
         }
         .contextMenu(forSelectionType: Torrent.ID.self) { selection in
@@ -119,6 +46,125 @@ struct TorrentTable: View {
                 reannounce: reannounce,
                 verify: verify
             )
+        }
+    }
+
+    private var columnPreferences: TorrentTableColumnPreferences {
+        TorrentTableColumnPreferences(encoded: encodedColumnPreferences)
+    }
+
+    @TableColumnBuilder<Torrent, Never>
+    private func tableColumn(at index: Int) -> some TableColumnContent<Torrent, Never> {
+        let columns = columnPreferences.visibleColumns
+        if columns.indices.contains(index) {
+            tableColumn(columns[index])
+        }
+    }
+
+    @TableColumnBuilder<Torrent, Never>
+    private func tableColumn(_ column: TorrentTableColumn) -> some TableColumnContent<Torrent, Never> {
+        switch column {
+        case .name:
+            TableColumn(column.title) { torrent in
+                Text(torrent.name)
+                    .lineLimit(1)
+            }
+            .width(min: 160, ideal: 260, max: .infinity)
+
+        case .progress:
+            TableColumn(column.title) { torrent in
+                ProgressView(value: torrent.percentDone)
+                    .controlSize(.small)
+            }
+            .width(min: 80, ideal: 120, max: .infinity)
+
+        case .size:
+            TableColumn(column.title) { torrent in
+                Text(ByteFormat.compactFileSize(torrent.totalSize))
+                    .monospacedDigit()
+            }
+            .width(min: 60, ideal: 64, max: 120)
+
+        case .sizeLeft:
+            TableColumn(column.title) { torrent in
+                Text(ByteFormat.compactFileSize(torrent.leftUntilDone))
+                    .monospacedDigit()
+            }
+            .width(min: 68, ideal: 72, max: 130)
+
+        case .status:
+            TableColumn(column.title) { torrent in
+                Text(torrent.status.displayName)
+                    .foregroundStyle(torrent.status == .unknown ? .secondary : .primary)
+                    .lineLimit(1)
+            }
+            .width(min: 80, ideal: 90, max: .infinity)
+
+        case .seeds:
+            TableColumn(column.title) { torrent in
+                Text(count(torrent.seedCount))
+                    .monospacedDigit()
+            }
+            .width(min: 45, ideal: 50, max: 90)
+
+        case .peers:
+            TableColumn(column.title) { torrent in
+                Text(count(torrent.peerCount))
+                    .monospacedDigit()
+            }
+            .width(min: 45, ideal: 50, max: 90)
+
+        case .downSpeed:
+            TableColumn(column.title) { torrent in
+                Text(ByteFormat.compactTransferRate(torrent.rateDownload))
+                    .monospacedDigit()
+            }
+            .width(min: 72, ideal: 78, max: .infinity)
+
+        case .upSpeed:
+            TableColumn(column.title) { torrent in
+                Text(ByteFormat.compactTransferRate(torrent.rateUpload))
+                    .monospacedDigit()
+            }
+            .width(min: 70, ideal: 74, max: .infinity)
+
+        case .eta:
+            TableColumn(column.title) { torrent in
+                Text(eta(torrent))
+                    .monospacedDigit()
+            }
+            .width(min: 56, ideal: 60, max: 120)
+
+        case .ratio:
+            TableColumn(column.title) { torrent in
+                Text(ratio(torrent.uploadRatio))
+                    .monospacedDigit()
+                    .foregroundStyle(ratioColor(torrent.uploadRatio))
+            }
+            .width(min: 52, ideal: 56, max: 100)
+
+        case .priority:
+            TableColumn(column.title) { torrent in
+                Menu {
+                    ForEach(BandwidthPriority.allCases) { priority in
+                        Button {
+                            setPriority(torrent.id, priority)
+                        } label: {
+                            if torrent.bandwidthPriority == priority {
+                                Label(priority.title, systemImage: "checkmark")
+                            } else {
+                                Text(priority.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Text(torrent.bandwidthPriority?.title ?? "Normal")
+                }
+                .menuStyle(.button)
+                .controlSize(.small)
+                .disabled(!canRunTorrentCommand)
+            }
+            .width(min: 80, ideal: 84, max: 150)
         }
     }
 
