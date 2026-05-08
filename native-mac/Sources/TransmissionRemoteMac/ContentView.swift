@@ -42,6 +42,11 @@ struct ContentView: View {
             await appModel.connectToSavedProfileIfAvailable()
             await appModel.runAutoRefreshLoop()
         }
+        .onOpenURL { url in
+            Task {
+                await appModel.handleIncomingURL(url)
+            }
+        }
         .searchable(text: $appModel.searchText, placement: .toolbar)
         .sheet(isPresented: $appModel.isConnectionSettingsPresented) {
             ConnectionSettingsView(

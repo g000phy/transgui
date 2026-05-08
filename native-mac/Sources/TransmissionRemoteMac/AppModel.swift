@@ -231,12 +231,17 @@ final class AppModel {
     }
 
     func addMagnetLink() async {
+        let magnetLink = magnetLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        await addMagnet(magnetLink)
+    }
+
+    func addMagnet(_ magnetLink: String) async {
         guard let rpcClient else {
+            magnetLinkDraft = magnetLink
             isConnectionSettingsPresented = true
             return
         }
 
-        let magnetLink = magnetLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !magnetLink.isEmpty else {
             return
         }
@@ -270,6 +275,17 @@ final class AppModel {
             await refreshTorrents()
         } catch {
             connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func handleIncomingURL(_ url: URL) async {
+        if url.scheme == "magnet" {
+            await addMagnet(url.absoluteString)
+            return
+        }
+
+        if url.isFileURL && url.pathExtension.localizedCaseInsensitiveCompare("torrent") == .orderedSame {
+            await addTorrentFile(at: url)
         }
     }
 
