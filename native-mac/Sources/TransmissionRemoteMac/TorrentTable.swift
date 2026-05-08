@@ -16,23 +16,28 @@ struct TorrentTable: View {
     var body: some View {
         GeometryReader { proxy in
             let layout = TorrentTableLayout(width: proxy.size.width)
+            let bodyHeight = max(proxy.size.height - 31, 0)
 
-            VStack(spacing: 0) {
-                header(layout: layout)
-                    .frame(height: 30)
-                    .padding(.horizontal, 8)
+            ScrollView(.horizontal) {
+                VStack(spacing: 0) {
+                    header(layout: layout)
+                        .frame(width: layout.contentWidth, height: 30, alignment: .leading)
+                        .padding(.horizontal, 8)
 
-                Divider()
+                    Divider()
 
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(torrents) { torrent in
-                            row(torrent, layout: layout)
-                                .padding(.horizontal, 8)
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(torrents) { torrent in
+                                row(torrent, layout: layout)
+                                    .padding(.horizontal, 8)
+                            }
                         }
+                        .padding(.vertical, 6)
                     }
-                    .padding(.vertical, 6)
+                    .frame(height: bodyHeight, alignment: .top)
                 }
+                .frame(width: layout.contentWidth + 16, height: proxy.size.height, alignment: .topLeading)
             }
         }
     }
@@ -75,7 +80,7 @@ struct TorrentTable: View {
                     rowCell(eta(torrent), width: layout.eta, isSelected: isSelected, monospaced: true)
                     rowCell(ratio(torrent.uploadRatio), width: layout.ratio, isSelected: isSelected, color: isSelected ? .white : ratioColor(torrent.uploadRatio), monospaced: true)
 
-                    priorityMenu(for: torrent)
+                    priorityMenu(for: torrent, isSelected: isSelected)
                         .frame(width: layout.priority, alignment: .leading)
                 }
 
@@ -85,7 +90,7 @@ struct TorrentTable: View {
             .padding(.vertical, 8)
         }
         .frame(height: 56)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: layout.contentWidth, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture {
             selectedTorrentID = torrent.id
@@ -126,7 +131,7 @@ struct TorrentTable: View {
             .frame(width: width, alignment: .leading)
     }
 
-    private func priorityMenu(for torrent: Torrent) -> some View {
+    private func priorityMenu(for torrent: Torrent, isSelected: Bool) -> some View {
         Menu {
             ForEach(BandwidthPriority.allCases) { priority in
                 Button {
@@ -140,10 +145,26 @@ struct TorrentTable: View {
                 }
             }
         } label: {
-            Text(torrent.bandwidthPriority?.title ?? "Normal")
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Text(torrent.bandwidthPriority?.title ?? "Normal")
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+                    .imageScale(.small)
+            }
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.white.opacity(0.18) : Color.secondary.opacity(0.12))
+            )
         }
-        .menuStyle(.button)
+        .buttonStyle(.plain)
         .controlSize(.small)
         .disabled(!canRunTorrentCommand)
     }
@@ -214,6 +235,7 @@ private struct FullWidthProgressBar: View {
 }
 
 private struct TorrentTableLayout {
+    let contentWidth: CGFloat
     let name: CGFloat
     let size: CGFloat
     let sizeLeft: CGFloat
@@ -227,23 +249,19 @@ private struct TorrentTableLayout {
     let priority: CGFloat
 
     init(width: CGFloat) {
-        let base: [CGFloat] = [180, 64, 72, 90, 50, 50, 78, 74, 60, 56, 84]
-        let minimum: [CGFloat] = [150, 60, 68, 80, 45, 45, 72, 70, 56, 52, 80]
+        let base: [CGFloat] = [460, 70, 80, 96, 50, 50, 84, 78, 60, 56, 90]
         let baseTotal = base.reduce(0, +)
-        let minimumTotal = minimum.reduce(0, +)
-        let available = max(width - 16, minimumTotal)
+        let available = width - 16
 
         let values: [CGFloat]
         if available >= baseTotal {
             let scale = available / baseTotal
             values = base.map { $0 * scale }
         } else {
-            let progress = max(0, min(1, (available - minimumTotal) / (baseTotal - minimumTotal)))
-            values = zip(minimum, base).map { minValue, baseValue in
-                minValue + (baseValue - minValue) * progress
-            }
+            values = base
         }
 
+        self.contentWidth = values.reduce(0, +)
         self.name = values[0]
         self.size = values[1]
         self.sizeLeft = values[2]
