@@ -151,16 +151,39 @@ struct TransmissionRPCClientTests {
                             "priority": 0
                           }
                         ],
+                        "trackers": [
+                          {
+                            "id": 1,
+                            "announce": "https://tracker.example/announce",
+                            "scrape": "https://tracker.example/scrape",
+                            "tier": 0
+                          }
+                        ],
                         "trackerStats": [
                           {
                             "id": 1,
                             "host": "tracker.example",
                             "announce": "https://tracker.example/announce",
+                            "announceState": 1,
                             "scrape": "https://tracker.example/scrape",
+                            "scrapeState": 1,
+                            "tier": 0,
+                            "hasAnnounced": true,
+                            "hasScraped": true,
+                            "isBackup": false,
+                            "lastAnnouncePeerCount": 6,
                             "lastAnnounceResult": "Success",
+                            "lastAnnounceStartTime": 1800000001,
                             "lastAnnounceSucceeded": true,
+                            "lastAnnounceTime": 1800000002,
                             "lastAnnounceTimedOut": false,
+                            "lastScrapeResult": "Success",
+                            "lastScrapeStartTime": 1800000003,
+                            "lastScrapeSucceeded": true,
+                            "lastScrapeTime": 1800000004,
+                            "lastScrapeTimedOut": false,
                             "nextAnnounceTime": 1800001000,
+                            "nextScrapeTime": 1800002000,
                             "seederCount": 12,
                             "leecherCount": 3,
                             "downloadCount": 4
@@ -190,7 +213,12 @@ struct TransmissionRPCClientTests {
 
         #expect(details?.downloadDir == "/downloads")
         #expect(details?.filesWithStats.single?.progress == 1)
+        #expect(details?.trackers?.single?.announce == "https://tracker.example/announce")
         #expect(details?.trackerStats.single?.host == "tracker.example")
+        #expect(details?.trackerStats.single?.announceState == .waiting)
+        #expect(details?.trackerStats.single?.hasAnnounced == true)
+        #expect(details?.trackerStats.single?.lastAnnouncePeerCount == 6)
+        #expect(details?.trackerStats.single?.nextScrapeTime == 1800002000)
         #expect(details?.peers.single?.address == "10.0.0.1")
     }
 
@@ -277,6 +305,22 @@ struct TransmissionRPCClientTests {
         #expect(request.method == "torrent-set")
         #expect(request.arguments.ids == [7])
         #expect(request.arguments.bandwidthPriority == 1)
+    }
+
+    @Test
+    func sendsRemoveTorrentAndData() async throws {
+        MockURLProtocol.responses = [
+            successResponse()
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        try await client.removeTorrent(ids: [7], deleteLocalData: true)
+
+        let body = try #require(MockURLProtocol.requestBodies.single.flatMap { $0 })
+        let request = try JSONDecoder().decode(TorrentRemoveRequest.self, from: body)
+        #expect(request.method == "torrent-remove")
+        #expect(request.arguments.ids == [7])
+        #expect(request.arguments.deleteLocalData == true)
     }
 
     @Test
@@ -464,6 +508,21 @@ private struct TorrentSetRequest: Decodable {
             case filesWanted = "files-wanted"
             case filesUnwanted = "files-unwanted"
             case priorityLow = "priority-low"
+        }
+    }
+}
+
+private struct TorrentRemoveRequest: Decodable {
+    let method: String
+    let arguments: Arguments
+
+    struct Arguments: Decodable {
+        let ids: [Int]
+        let deleteLocalData: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case ids
+            case deleteLocalData = "delete-local-data"
         }
     }
 }

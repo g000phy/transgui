@@ -100,8 +100,10 @@ struct ContentView: View {
             ),
             titleVisibility: .visible
         ) {
-            Button(appModel.pendingRemoval?.actionTitle ?? "Remove", role: .destructive) {
-                Task { await appModel.removePendingTorrents() }
+            if let pendingRemoval = appModel.pendingRemoval {
+                Button(pendingRemoval.actionTitle, role: .destructive) {
+                    Task { await appModel.removeTorrents(for: pendingRemoval) }
+                }
             }
 
             Button("Cancel", role: .cancel) {

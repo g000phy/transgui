@@ -54,6 +54,8 @@ cat >"$INFO_PLIST" <<PLIST
   <string>Transmission Remote Mac</string>
   <key>CFBundleIconFile</key>
   <string>$ICON_NAME</string>
+  <key>CFBundleIconName</key>
+  <string>TransmissionRemoteMac</string>
   <key>CFBundleShortVersionString</key>
   <string>$VERSION</string>
   <key>CFBundleVersion</key>

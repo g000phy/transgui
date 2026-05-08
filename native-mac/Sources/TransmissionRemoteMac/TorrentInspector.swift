@@ -206,45 +206,126 @@ private struct TorrentTrackersView: View {
     let details: TorrentDetails?
 
     var body: some View {
-        if let details, !details.trackerStats.isEmpty {
-            Table(details.trackerStats) {
-                TableColumn("Host") { tracker in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tracker.host ?? tracker.announce ?? "Tracker")
-                            .lineLimit(1)
+        let rows = details.map(TrackerDisplayRow.rows) ?? []
 
-                        if let result = tracker.lastAnnounceResult, !result.isEmpty {
-                            Text(result)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .padding(.vertical, 4)
+        if !rows.isEmpty {
+            Table(rows) {
+                TableColumn("Name") { row in
+                    Text(row.name)
+                        .lineLimit(1)
                 }
 
-                TableColumn("Seeders") { tracker in
-                    Text(trackerCount(tracker.seederCount))
+                TableColumn("Status") { row in
+                    Text(row.status)
+                        .foregroundStyle(row.isError ? .red : .primary)
+                        .lineLimit(1)
+                }
+                .width(min: 110, ideal: 150)
+
+                TableColumn("Update in") { row in
+                    Text(row.updateIn)
                         .monospacedDigit()
                 }
-                .width(min: 70, ideal: 90)
+                .width(min: 100, ideal: 120)
 
-                TableColumn("Leechers") { tracker in
-                    Text(trackerCount(tracker.leecherCount))
+                TableColumn("Seeds") { row in
+                    Text(row.seeds)
                         .monospacedDigit()
                 }
-                .width(min: 70, ideal: 90)
+                .width(min: 70, ideal: 80)
             }
         } else {
             ContentUnavailableView("No Trackers", systemImage: "antenna.radiowaves.left.and.right")
         }
     }
+}
 
-    private func trackerCount(_ value: Int?) -> String {
-        guard let value, value >= 0 else {
-            return "Unknown"
+private struct TrackerDisplayRow: Identifiable {
+    let id: Int
+    let name: String
+    let status: String
+    let updateIn: String
+    let seeds: String
+    let isError: Bool
+
+    static func rows(_ details: TorrentDetails) -> [TrackerDisplayRow] {
+        if let trackers = details.trackers, !trackers.isEmpty {
+            return trackers.enumerated().map { index, tracker in
+                let stats = details.trackerStats.first { $0.id == tracker.id }
+                    ?? details.trackerStats[safe: index]
+                return TrackerDisplayRow(tracker: tracker, stats: stats, fallbackID: index)
+            }
         }
+
+        return details.trackerStats.enumerated().map { index, stats in
+            TrackerDisplayRow(tracker: nil, stats: stats, fallbackID: index)
+        }
+    }
+
+    private init(tracker: TorrentTracker?, stats: TrackerStats?, fallbackID: Int) {
+        self.id = tracker?.id ?? stats?.id ?? fallbackID
+        self.name = tracker?.announce ?? stats?.announce ?? stats?.host ?? "Tracker"
+        self.status = Self.status(for: stats)
+        self.updateIn = Self.updateIn(for: stats)
+        self.seeds = Self.count(stats?.seederCount)
+        self.isError = Self.isError(stats)
+    }
+
+    private static func status(for stats: TrackerStats?) -> String {
+        guard let stats else {
+            return ""
+        }
+
+        if stats.announceState?.isUpdating == true {
+            return "Updating"
+        }
+
+        if stats.hasAnnounced == true || stats.lastAnnounceResult != nil {
+            if stats.lastAnnounceSucceeded == true || stats.lastAnnounceResult == "Success" {
+                return "Working"
+            }
+
+            if let result = stats.lastAnnounceResult, !result.isEmpty {
+                return result
+            }
+        }
+
+        return ""
+    }
+
+    private static func updateIn(for stats: TrackerStats?) -> String {
+        guard let stats else {
+            return ""
+        }
+
+        if stats.announceState?.isUpdating == true {
+            return "Updating..."
+        }
+
+        guard let nextAnnounceTime = stats.nextAnnounceTime, nextAnnounceTime > 1 else {
+            return ""
+        }
+
+        let remainingSeconds = max(0, nextAnnounceTime - Int(Date().timeIntervalSince1970))
+        return DateFormat.duration(seconds: remainingSeconds)
+    }
+
+    private static func count(_ value: Int?) -> String {
+        guard let value, value >= 0 else {
+            return ""
+        }
+
         return value.formatted()
+    }
+
+    private static func isError(_ stats: TrackerStats?) -> Bool {
+        guard let stats else {
+            return false
+        }
+
+        return stats.hasAnnounced == true
+            && stats.lastAnnounceSucceeded == false
+            && stats.announceState?.isUpdating != true
     }
 }
 
@@ -301,5 +382,27 @@ private enum DateFormat {
 
         return Date(timeIntervalSince1970: TimeInterval(timestamp))
             .formatted(date: .abbreviated, time: .shortened)
+    }
+
+    static func duration(seconds: Int) -> String {
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        let seconds = seconds % 60
+
+        if hours > 0 {
+            return "\(hours)h, \(minutes)m"
+        }
+
+        if minutes > 0 {
+            return "\(minutes)m, \(seconds)s"
+        }
+
+        return "\(seconds)s"
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

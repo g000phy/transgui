@@ -367,16 +367,14 @@ final class AppModel {
         )
     }
 
-    func removePendingTorrents() async {
-        guard let pendingRemoval else {
-            return
-        }
-
+    func removeTorrents(for pendingRemoval: TorrentRemovalRequest) async {
         await removeTorrents(
             ids: pendingRemoval.torrentIDs,
             deleteLocalData: pendingRemoval.deleteLocalData
         )
-        self.pendingRemoval = nil
+        if self.pendingRemoval == pendingRemoval {
+            self.pendingRemoval = nil
+        }
     }
 
     private func removeTorrents(ids: [Torrent.ID], deleteLocalData: Bool) async {

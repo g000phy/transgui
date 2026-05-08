@@ -148,6 +148,7 @@ public enum TorrentField: String, Sendable {
     case percentDone
     case secondsDownloading
     case secondsSeeding
+    case trackers
     case trackerStats
     case totalSize
     case rateDownload
@@ -194,6 +195,7 @@ public enum TorrentField: String, Sendable {
         .peersConnected,
         .peersGettingFromUs,
         .peersSendingToUs,
+        .trackers,
         .files,
         .fileStats,
         .trackerStats,
@@ -229,6 +231,7 @@ public struct TorrentDetails: Identifiable, Decodable, Equatable, Sendable {
     public let peersConnected: Int?
     public let peersGettingFromUs: Int?
     public let peersSendingToUs: Int?
+    public let trackers: [TorrentTracker]?
     public let files: [TorrentFile]
     public let fileStats: [TorrentFileStats]
     public let trackerStats: [TrackerStats]
@@ -323,14 +326,54 @@ public struct TrackerStats: Identifiable, Decodable, Equatable, Sendable {
     public let id: Int
     public let host: String?
     public let announce: String?
+    public let announceState: TrackerState?
     public let scrape: String?
+    public let scrapeState: TrackerState?
+    public let tier: Int?
+    public let hasAnnounced: Bool?
+    public let hasScraped: Bool?
+    public let isBackup: Bool?
+    public let lastAnnouncePeerCount: Int?
     public let lastAnnounceResult: String?
+    public let lastAnnounceStartTime: Int?
     public let lastAnnounceSucceeded: Bool?
+    public let lastAnnounceTime: Int?
     public let lastAnnounceTimedOut: Bool?
+    public let lastScrapeResult: String?
+    public let lastScrapeStartTime: Int?
+    public let lastScrapeSucceeded: Bool?
+    public let lastScrapeTime: Int?
+    public let lastScrapeTimedOut: Bool?
     public let nextAnnounceTime: Int?
+    public let nextScrapeTime: Int?
     public let seederCount: Int?
     public let leecherCount: Int?
     public let downloadCount: Int?
+}
+
+public struct TorrentTracker: Identifiable, Decodable, Equatable, Sendable {
+    public let id: Int
+    public let announce: String
+    public let scrape: String?
+    public let tier: Int?
+}
+
+public enum TrackerState: Int, Decodable, Equatable, Sendable {
+    case inactive = 0
+    case waiting = 1
+    case queued = 2
+    case active = 3
+    case unknown = -1
+
+    public var isUpdating: Bool {
+        self == .queued || self == .active
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(Int.self)
+        self = TrackerState(rawValue: rawValue) ?? .unknown
+    }
 }
 
 public struct TorrentPeer: Identifiable, Decodable, Equatable, Sendable {
