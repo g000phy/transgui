@@ -5,7 +5,7 @@ MODE="${1:-run}"
 APP_NAME="TransmissionRemoteMac"
 BUNDLE_ID="com.g000phy.TransmissionRemoteMac"
 MIN_SYSTEM_VERSION="15.0"
-VERSION="0.1.0"
+VERSION="0.1.1"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SWIFT_DIR="$ROOT_DIR/native-mac"
@@ -18,6 +18,8 @@ APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 ICON_SOURCE="$ROOT_DIR/setup/macosx/transgui.icns"
 ICON_NAME="TransmissionRemoteMac.icns"
+ICONSET_DIR="$DIST_DIR/$APP_NAME.iconset"
+ICON_BASE_PNG="$DIST_DIR/$APP_NAME-icon.png"
 
 BUILD_CONFIGURATION="debug"
 if [[ "$MODE" == "--release" || "$MODE" == "release" ]]; then
@@ -39,7 +41,30 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
-cp "$ICON_SOURCE" "$APP_RESOURCES/$ICON_NAME"
+
+build_app_icon() {
+  rm -rf "$ICONSET_DIR" "$ICON_BASE_PNG"
+  mkdir -p "$ICONSET_DIR"
+
+  sips -s format png "$ICON_SOURCE" --out "$ICON_BASE_PNG" >/dev/null
+  sips -z 16 16 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_16x16.png" >/dev/null
+  sips -z 32 32 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_16x16@2x.png" >/dev/null
+  sips -z 32 32 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_32x32.png" >/dev/null
+  sips -z 64 64 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_32x32@2x.png" >/dev/null
+  sips -z 128 128 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_128x128.png" >/dev/null
+  sips -z 256 256 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_128x128@2x.png" >/dev/null
+  sips -z 256 256 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_256x256.png" >/dev/null
+  sips -z 512 512 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_256x256@2x.png" >/dev/null
+  sips -z 512 512 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_512x512.png" >/dev/null
+  sips -z 1024 1024 "$ICON_BASE_PNG" --out "$ICONSET_DIR/icon_512x512@2x.png" >/dev/null
+
+  iconutil -c icns "$ICONSET_DIR" -o "$APP_RESOURCES/$ICON_NAME"
+  rm -rf "$ICONSET_DIR" "$ICON_BASE_PNG"
+}
+
+if ! build_app_icon; then
+  cp "$ICON_SOURCE" "$APP_RESOURCES/$ICON_NAME"
+fi
 
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -53,7 +78,7 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundleDisplayName</key>
   <string>Transmission Remote Mac</string>
   <key>CFBundleIconFile</key>
-  <string>$ICON_NAME</string>
+  <string>${ICON_NAME%.icns}</string>
   <key>CFBundleIconName</key>
   <string>TransmissionRemoteMac</string>
   <key>CFBundleShortVersionString</key>

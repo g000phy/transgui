@@ -15,6 +15,7 @@ final class AppModel {
     var isSpeedSettingsPresented = false
     var pendingRemoval: TorrentRemovalRequest?
     var magnetLinkDraft = ""
+    var addMagnetErrorMessage: String?
     var torrents: [Torrent] = Torrent.previewData
     var selectedTorrentDetails: TorrentDetails?
     var isLoadingTorrentDetails = false
@@ -290,20 +291,29 @@ final class AppModel {
         }
     }
 
-    func addMagnetLink() async {
+    @discardableResult
+    func addMagnetLink() async -> Bool {
         let magnetLink = magnetLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        await addMagnet(magnetLink)
+        return await addMagnet(magnetLink)
     }
 
-    func addMagnet(_ magnetLink: String) async {
+    @discardableResult
+    func addMagnet(_ magnetLink: String) async -> Bool {
+        addMagnetErrorMessage = nil
+
         guard let rpcClient else {
             magnetLinkDraft = magnetLink
             isConnectionSettingsPresented = true
-            return
+            return false
         }
 
         guard !magnetLink.isEmpty else {
-            return
+            return false
+        }
+
+        guard MagnetLinkValidator.isValid(magnetLink) else {
+            addMagnetErrorMessage = "Link not recognized. Check the link."
+            return false
         }
 
         do {
@@ -311,8 +321,10 @@ final class AppModel {
             magnetLinkDraft = ""
             isAddTorrentPresented = false
             await refreshTorrents()
+            return true
         } catch {
-            connectionState = .failed(message: error.localizedDescription)
+            addMagnetErrorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -447,6 +459,27 @@ enum ConnectionState: Equatable {
     case connecting
     case connected(serverName: String)
     case failed(message: String)
+}
+
+enum MagnetLinkValidator {
+    static func isValid(_ rawValue: String) -> Bool {
+        guard
+            let components = URLComponents(string: rawValue),
+            components.scheme?.localizedCaseInsensitiveCompare("magnet") == .orderedSame,
+            let queryItems = components.queryItems,
+            queryItems.contains(where: { item in
+                item.name.localizedCaseInsensitiveCompare("xt") == .orderedSame
+                    && (
+                        item.value?.localizedCaseInsensitiveContains("urn:btih:") == true
+                            || item.value?.localizedCaseInsensitiveContains("urn:btmh:") == true
+                    )
+            })
+        else {
+            return false
+        }
+
+        return true
+    }
 }
 
 struct TorrentRemovalRequest: Identifiable, Equatable {

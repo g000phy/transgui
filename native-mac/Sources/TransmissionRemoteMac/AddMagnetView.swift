@@ -8,20 +8,40 @@ struct AddMagnetView: View {
         @Bindable var appModel = appModel
 
         VStack(alignment: .leading, spacing: 0) {
-            Form {
-                Section("Magnet Link") {
-                    TextField("magnet:?", text: $appModel.magnetLinkDraft, axis: .vertical)
-                        .lineLimit(3...6)
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Magnet Link")
+                    .font(.title3.weight(.semibold))
 
-                if case .failed(let message) = appModel.connectionState {
-                    Section {
-                        Label(message, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.quaternary.opacity(0.35))
+
+                    TextEditor(text: $appModel.magnetLinkDraft)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .textSelection(.enabled)
+                        .padding(8)
+                        .frame(minHeight: 112, maxHeight: 112)
+                        .onChange(of: appModel.magnetLinkDraft) {
+                            appModel.addMagnetErrorMessage = nil
+                        }
+
+                    if appModel.magnetLinkDraft.isEmpty {
+                        Text("Paste link")
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 16)
+                            .allowsHitTesting(false)
                     }
                 }
+
+                if let message = appModel.addMagnetErrorMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
             }
-            .formStyle(.grouped)
+            .padding(24)
 
             Divider()
 
@@ -36,8 +56,8 @@ struct AddMagnetView: View {
 
                 Button {
                     Task {
-                        await appModel.addMagnetLink()
-                        if !appModel.isAddTorrentPresented {
+                        let didAdd = await appModel.addMagnetLink()
+                        if didAdd {
                             dismiss()
                         }
                     }
@@ -49,7 +69,10 @@ struct AddMagnetView: View {
             }
             .padding()
         }
-        .frame(width: 520, height: 240)
+        .frame(width: 620, height: 280)
+        .onAppear {
+            appModel.addMagnetErrorMessage = nil
+        }
     }
 }
 
