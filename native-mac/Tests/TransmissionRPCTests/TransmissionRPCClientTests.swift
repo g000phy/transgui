@@ -224,6 +224,44 @@ struct TransmissionRPCClientTests {
         #expect(request.arguments.filename == nil)
     }
 
+    @Test
+    func sendsSessionSpeedLimits() async throws {
+        MockURLProtocol.responses = [
+            MockResponse(
+                statusCode: 200,
+                headers: [:],
+                body: """
+                {
+                  "result": "success",
+                  "arguments": {}
+                }
+                """.data(using: .utf8)!
+            )
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        try await client.sessionSet(
+            speedLimits: SpeedLimits(
+                downloadLimitKBps: 500,
+                isDownloadLimitEnabled: true,
+                uploadLimitKBps: 100,
+                isUploadLimitEnabled: false,
+                altDownloadLimitKBps: 50,
+                altUploadLimitKBps: 25,
+                isAltSpeedEnabled: true
+            )
+        )
+
+        let body = try #require(MockURLProtocol.requestBodies.single.flatMap { $0 })
+        let request = try JSONDecoder().decode(SessionSetRequest.self, from: body)
+        #expect(request.method == "session-set")
+        #expect(request.arguments.speedLimitDown == 500)
+        #expect(request.arguments.speedLimitDownEnabled == true)
+        #expect(request.arguments.speedLimitUp == 100)
+        #expect(request.arguments.speedLimitUpEnabled == false)
+        #expect(request.arguments.altSpeedEnabled == true)
+    }
+
     private var server: TransmissionServer {
         TransmissionServer(rpcURL: URL(string: "http://example.test/transmission/rpc")!)
     }
@@ -313,6 +351,27 @@ private struct TorrentAddRequest: Decodable {
     struct Arguments: Decodable {
         let filename: String?
         let metainfo: String?
+    }
+}
+
+private struct SessionSetRequest: Decodable {
+    let method: String
+    let arguments: Arguments
+
+    struct Arguments: Decodable {
+        let speedLimitDown: Int
+        let speedLimitDownEnabled: Bool
+        let speedLimitUp: Int
+        let speedLimitUpEnabled: Bool
+        let altSpeedEnabled: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case speedLimitDown = "speed-limit-down"
+            case speedLimitDownEnabled = "speed-limit-down-enabled"
+            case speedLimitUp = "speed-limit-up"
+            case speedLimitUpEnabled = "speed-limit-up-enabled"
+            case altSpeedEnabled = "alt-speed-enabled"
+        }
     }
 }
 

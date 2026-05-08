@@ -12,11 +12,21 @@ final class AppModel {
     var connectionProfile: ConnectionProfile
     var isConnectionSettingsPresented = false
     var isAddTorrentPresented = false
+    var isSpeedSettingsPresented = false
     var isRemoveConfirmationPresented = false
     var magnetLinkDraft = ""
     var torrents: [Torrent] = Torrent.previewData
     var selectedTorrentDetails: TorrentDetails?
     var isLoadingTorrentDetails = false
+    var speedLimits = SpeedLimits(
+        downloadLimitKBps: 100,
+        isDownloadLimitEnabled: false,
+        uploadLimitKBps: 100,
+        isUploadLimitEnabled: false,
+        altDownloadLimitKBps: 50,
+        altUploadLimitKBps: 50,
+        isAltSpeedEnabled: false
+    )
 
     private var rpcClient: TransmissionRPCClient?
     private let profileStore: ConnectionProfileStore
@@ -120,6 +130,7 @@ final class AppModel {
             let torrentList = try await client.torrentGet()
 
             rpcClient = client
+            speedLimits = SpeedLimits(session: session)
             torrents = torrentList.torrents
             selectedTorrentDetails = nil
             selectedTorrentID = torrents.first?.id
@@ -145,6 +156,33 @@ final class AppModel {
                 self.selectedTorrentID = torrents.first?.id
             }
             await loadSelectedTorrentDetails()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func refreshSessionSettings() async {
+        guard let rpcClient else {
+            return
+        }
+
+        do {
+            speedLimits = SpeedLimits(session: try await rpcClient.sessionGet())
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func applySpeedLimits(_ draft: SpeedLimits) async {
+        guard let rpcClient else {
+            isConnectionSettingsPresented = true
+            return
+        }
+
+        do {
+            try await rpcClient.sessionSet(speedLimits: draft)
+            speedLimits = draft
+            isSpeedSettingsPresented = false
         } catch {
             connectionState = .failed(message: error.localizedDescription)
         }

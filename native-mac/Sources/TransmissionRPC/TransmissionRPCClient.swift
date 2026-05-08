@@ -44,6 +44,11 @@ public final class TransmissionRPCClient: Sendable {
         try await call(method: "session-get", arguments: EmptyArguments())
     }
 
+    public func sessionSet(speedLimits: SpeedLimits) async throws {
+        let arguments = SessionSetArguments(speedLimits: speedLimits)
+        let _: EmptyArguments = try await call(method: "session-set", arguments: arguments)
+    }
+
     public func torrentGet(fields: [TorrentField] = TorrentField.defaultListFields) async throws -> TorrentList {
         try await call(method: "torrent-get", arguments: TorrentGetArguments(fields: fields.map(\.rawValue)))
     }
@@ -198,5 +203,35 @@ private struct TorrentAddArguments: Encodable {
         case filename
         case metainfo
         case downloadDirectory = "download-dir"
+    }
+}
+
+private struct SessionSetArguments: Encodable {
+    let speedLimitDown: Int
+    let speedLimitDownEnabled: Bool
+    let speedLimitUp: Int
+    let speedLimitUpEnabled: Bool
+    let altSpeedDown: Int
+    let altSpeedUp: Int
+    let altSpeedEnabled: Bool
+
+    init(speedLimits: SpeedLimits) {
+        self.speedLimitDown = speedLimits.downloadLimitKBps
+        self.speedLimitDownEnabled = speedLimits.isDownloadLimitEnabled
+        self.speedLimitUp = speedLimits.uploadLimitKBps
+        self.speedLimitUpEnabled = speedLimits.isUploadLimitEnabled
+        self.altSpeedDown = speedLimits.altDownloadLimitKBps
+        self.altSpeedUp = speedLimits.altUploadLimitKBps
+        self.altSpeedEnabled = speedLimits.isAltSpeedEnabled
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case speedLimitDown = "speed-limit-down"
+        case speedLimitDownEnabled = "speed-limit-down-enabled"
+        case speedLimitUp = "speed-limit-up"
+        case speedLimitUpEnabled = "speed-limit-up-enabled"
+        case altSpeedDown = "alt-speed-down"
+        case altSpeedUp = "alt-speed-up"
+        case altSpeedEnabled = "alt-speed-enabled"
     }
 }

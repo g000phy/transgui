@@ -4,11 +4,65 @@ public struct TransmissionSession: Decodable, Equatable, Sendable {
     public let version: String?
     public let rpcVersion: Int?
     public let downloadDirectory: String?
+    public let speedLimitDown: Int?
+    public let speedLimitDownEnabled: Bool?
+    public let speedLimitUp: Int?
+    public let speedLimitUpEnabled: Bool?
+    public let altSpeedDown: Int?
+    public let altSpeedUp: Int?
+    public let altSpeedEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case version
         case rpcVersion = "rpc-version"
         case downloadDirectory = "download-dir"
+        case speedLimitDown = "speed-limit-down"
+        case speedLimitDownEnabled = "speed-limit-down-enabled"
+        case speedLimitUp = "speed-limit-up"
+        case speedLimitUpEnabled = "speed-limit-up-enabled"
+        case altSpeedDown = "alt-speed-down"
+        case altSpeedUp = "alt-speed-up"
+        case altSpeedEnabled = "alt-speed-enabled"
+    }
+}
+
+public struct SpeedLimits: Equatable, Sendable {
+    public var downloadLimitKBps: Int
+    public var isDownloadLimitEnabled: Bool
+    public var uploadLimitKBps: Int
+    public var isUploadLimitEnabled: Bool
+    public var altDownloadLimitKBps: Int
+    public var altUploadLimitKBps: Int
+    public var isAltSpeedEnabled: Bool
+
+    public init(
+        downloadLimitKBps: Int,
+        isDownloadLimitEnabled: Bool,
+        uploadLimitKBps: Int,
+        isUploadLimitEnabled: Bool,
+        altDownloadLimitKBps: Int,
+        altUploadLimitKBps: Int,
+        isAltSpeedEnabled: Bool
+    ) {
+        self.downloadLimitKBps = downloadLimitKBps
+        self.isDownloadLimitEnabled = isDownloadLimitEnabled
+        self.uploadLimitKBps = uploadLimitKBps
+        self.isUploadLimitEnabled = isUploadLimitEnabled
+        self.altDownloadLimitKBps = altDownloadLimitKBps
+        self.altUploadLimitKBps = altUploadLimitKBps
+        self.isAltSpeedEnabled = isAltSpeedEnabled
+    }
+
+    public init(session: TransmissionSession) {
+        self.init(
+            downloadLimitKBps: session.speedLimitDown ?? 100,
+            isDownloadLimitEnabled: session.speedLimitDownEnabled ?? false,
+            uploadLimitKBps: session.speedLimitUp ?? 100,
+            isUploadLimitEnabled: session.speedLimitUpEnabled ?? false,
+            altDownloadLimitKBps: session.altSpeedDown ?? 50,
+            altUploadLimitKBps: session.altSpeedUp ?? 50,
+            isAltSpeedEnabled: session.altSpeedEnabled ?? false
+        )
     }
 }
 

@@ -56,6 +56,10 @@ struct ContentView: View {
             AddMagnetView()
                 .environment(appModel)
         }
+        .sheet(isPresented: $appModel.isSpeedSettingsPresented) {
+            SpeedSettingsView(draft: appModel.speedLimits)
+                .environment(appModel)
+        }
         .fileImporter(
             isPresented: $isTorrentFileImporterPresented,
             allowedContentTypes: [.torrentFile],
@@ -122,6 +126,15 @@ struct ContentView: View {
                 }
                 .menuStyle(.button)
                 .help("Add magnet link or torrent file")
+                .disabled(!appModel.isConnected)
+
+                Button {
+                    Task { await appModel.refreshSessionSettings() }
+                    appModel.isSpeedSettingsPresented = true
+                } label: {
+                    Label("Speed Limits", systemImage: "gauge.with.dots.needle.67percent")
+                }
+                .help("Configure global speed limits")
                 .disabled(!appModel.isConnected)
 
                 Button {
