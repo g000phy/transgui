@@ -131,6 +131,7 @@ public enum TorrentStatus: Int, Decodable, Equatable, Sendable {
 public enum TorrentField: String, Sendable {
     case activityDate
     case addedDate
+    case bandwidthPriority
     case dateCreated
     case downloadDir
     case downloadedEver
@@ -175,6 +176,7 @@ public enum TorrentField: String, Sendable {
         .status,
         .percentDone,
         .totalSize,
+        .bandwidthPriority,
         .downloadDir,
         .downloadedEver,
         .uploadedEver,
@@ -209,6 +211,7 @@ public struct TorrentDetails: Identifiable, Decodable, Equatable, Sendable {
     public let status: TorrentStatus
     public let percentDone: Double
     public let totalSize: Int64
+    public let bandwidthPriority: BandwidthPriority
     public let downloadDir: String?
     public let downloadedEver: Int64?
     public let uploadedEver: Int64?
@@ -242,6 +245,31 @@ public struct TorrentDetails: Identifiable, Decodable, Equatable, Sendable {
     }
 }
 
+public enum BandwidthPriority: Int, CaseIterable, Decodable, Equatable, Identifiable, Sendable {
+    case low = -1
+    case normal = 0
+    case high = 1
+
+    public var id: Int { rawValue }
+
+    public var title: String {
+        switch self {
+        case .low:
+            "Low"
+        case .normal:
+            "Normal"
+        case .high:
+            "High"
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(Int.self)
+        self = BandwidthPriority(rawValue: rawValue) ?? .normal
+    }
+}
+
 public struct TorrentFile: Decodable, Equatable, Sendable {
     public let name: String
     public let length: Int64
@@ -252,6 +280,29 @@ public struct TorrentFileStats: Decodable, Equatable, Sendable {
     public let bytesCompleted: Int64
     public let wanted: Bool
     public let priority: Int
+
+    public var priorityLevel: FilePriority {
+        FilePriority(rawValue: priority) ?? .normal
+    }
+}
+
+public enum FilePriority: Int, CaseIterable, Equatable, Identifiable, Sendable {
+    case low = -1
+    case normal = 0
+    case high = 1
+
+    public var id: Int { rawValue }
+
+    public var title: String {
+        switch self {
+        case .low:
+            "Low"
+        case .normal:
+            "Normal"
+        case .high:
+            "High"
+        }
+    }
 }
 
 public struct TorrentFileWithStats: Identifiable, Equatable, Sendable {

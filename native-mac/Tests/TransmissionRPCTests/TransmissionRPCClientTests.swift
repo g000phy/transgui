@@ -119,6 +119,7 @@ struct TransmissionRPCClientTests {
                         "status": 6,
                         "percentDone": 1,
                         "totalSize": 2048,
+                        "bandwidthPriority": 0,
                         "downloadDir": "/downloads",
                         "downloadedEver": 2048,
                         "uploadedEver": 4096,
@@ -262,6 +263,43 @@ struct TransmissionRPCClientTests {
         #expect(request.arguments.altSpeedEnabled == true)
     }
 
+    @Test
+    func sendsTorrentPriority() async throws {
+        MockURLProtocol.responses = [
+            successResponse()
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        try await client.setTorrentPriority(id: 7, priority: .high)
+
+        let body = try #require(MockURLProtocol.requestBodies.single.flatMap { $0 })
+        let request = try JSONDecoder().decode(TorrentSetRequest.self, from: body)
+        #expect(request.method == "torrent-set")
+        #expect(request.arguments.ids == [7])
+        #expect(request.arguments.bandwidthPriority == 1)
+    }
+
+    @Test
+    func sendsFileWantedAndPriority() async throws {
+        MockURLProtocol.responses = [
+            successResponse(),
+            successResponse()
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        try await client.setFileWanted(torrentID: 7, fileIDs: [2], wanted: false)
+        try await client.setFilePriority(torrentID: 7, fileIDs: [2], priority: .low)
+
+        let firstBody = try #require(MockURLProtocol.requestBodies.first.flatMap { $0 })
+        let secondBody = try #require(MockURLProtocol.requestBodies.dropFirst().first.flatMap { $0 })
+        let wantedRequest = try JSONDecoder().decode(TorrentSetRequest.self, from: firstBody)
+        let priorityRequest = try JSONDecoder().decode(TorrentSetRequest.self, from: secondBody)
+
+        #expect(wantedRequest.arguments.filesUnwanted == [2])
+        #expect(wantedRequest.arguments.filesWanted == nil)
+        #expect(priorityRequest.arguments.priorityLow == [2])
+    }
+
     private var server: TransmissionServer {
         TransmissionServer(rpcURL: URL(string: "http://example.test/transmission/rpc")!)
     }
@@ -272,6 +310,19 @@ struct TransmissionRPCClientTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+
+    private func successResponse() -> MockResponse {
+        MockResponse(
+            statusCode: 200,
+            headers: [:],
+            body: """
+            {
+              "result": "success",
+              "arguments": {}
+            }
+            """.data(using: .utf8)!
+        )
     }
 }
 
@@ -371,6 +422,27 @@ private struct SessionSetRequest: Decodable {
             case speedLimitUp = "speed-limit-up"
             case speedLimitUpEnabled = "speed-limit-up-enabled"
             case altSpeedEnabled = "alt-speed-enabled"
+        }
+    }
+}
+
+private struct TorrentSetRequest: Decodable {
+    let method: String
+    let arguments: Arguments
+
+    struct Arguments: Decodable {
+        let ids: [Int]
+        let bandwidthPriority: Int?
+        let filesWanted: [Int]?
+        let filesUnwanted: [Int]?
+        let priorityLow: [Int]?
+
+        enum CodingKeys: String, CodingKey {
+            case ids
+            case bandwidthPriority
+            case filesWanted = "files-wanted"
+            case filesUnwanted = "files-unwanted"
+            case priorityLow = "priority-low"
         }
     }
 }

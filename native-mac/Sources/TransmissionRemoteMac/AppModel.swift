@@ -302,6 +302,45 @@ final class AppModel {
             connectionState = .failed(message: error.localizedDescription)
         }
     }
+
+    func setSelectedTorrentPriority(_ priority: BandwidthPriority) async {
+        guard let selectedTorrentID, let rpcClient else {
+            return
+        }
+
+        do {
+            try await rpcClient.setTorrentPriority(id: selectedTorrentID, priority: priority)
+            await refreshTorrents()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func setTorrentFileWanted(fileID: Int, wanted: Bool) async {
+        guard let selectedTorrentID, let rpcClient else {
+            return
+        }
+
+        do {
+            try await rpcClient.setFileWanted(torrentID: selectedTorrentID, fileIDs: [fileID], wanted: wanted)
+            await loadSelectedTorrentDetails()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func setTorrentFilePriority(fileID: Int, priority: FilePriority) async {
+        guard let selectedTorrentID, let rpcClient else {
+            return
+        }
+
+        do {
+            try await rpcClient.setFilePriority(torrentID: selectedTorrentID, fileIDs: [fileID], priority: priority)
+            await loadSelectedTorrentDetails()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
 }
 
 enum ConnectionState: Equatable {

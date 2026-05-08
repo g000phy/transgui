@@ -39,6 +39,8 @@ struct TorrentInspector: View {
 }
 
 private struct TorrentOverviewView: View {
+    @Environment(AppModel.self) private var appModel
+
     let torrent: Torrent
     let details: TorrentDetails?
     let isLoading: Bool
@@ -74,6 +76,16 @@ private struct TorrentOverviewView: View {
             }
 
             if let details {
+                Section("Priority") {
+                    Picker("Bandwidth", selection: priorityBinding(for: details)) {
+                        ForEach(BandwidthPriority.allCases) { priority in
+                            Text(priority.title)
+                                .tag(priority)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 Section("Peers") {
                     LabeledContent("Connected", value: (details.peersConnected ?? 0).formatted())
                     LabeledContent("Downloading from us", value: (details.peersGettingFromUs ?? 0).formatted())
@@ -104,9 +116,24 @@ private struct TorrentOverviewView: View {
         .formStyle(.grouped)
         .padding()
     }
+
+    private func priorityBinding(for details: TorrentDetails) -> Binding<BandwidthPriority> {
+        Binding(
+            get: {
+                details.bandwidthPriority
+            },
+            set: { priority in
+                Task {
+                    await appModel.setSelectedTorrentPriority(priority)
+                }
+            }
+        )
+    }
 }
 
 private struct TorrentFilesView: View {
+    @Environment(AppModel.self) private var appModel
+
     let details: TorrentDetails?
 
     var body: some View {
@@ -130,31 +157,47 @@ private struct TorrentFilesView: View {
                 .width(min: 86, ideal: 104)
 
                 TableColumn("Wanted") { file in
-                    Image(systemName: file.stats?.wanted == false ? "minus.circle" : "checkmark.circle")
-                        .foregroundStyle(file.stats?.wanted == false ? Color.secondary : Color.green)
+                    Button {
+                        Task {
+                            await appModel.setTorrentFileWanted(
+                                fileID: file.id,
+                                wanted: !(file.stats?.wanted ?? true)
+                            )
+                        }
+                    } label: {
+                        Image(systemName: file.stats?.wanted == false ? "minus.circle" : "checkmark.circle")
+                            .foregroundStyle(file.stats?.wanted == false ? Color.secondary : Color.green)
+                    }
+                    .buttonStyle(.plain)
+                    .help(file.stats?.wanted == false ? "Download this file" : "Skip this file")
                 }
                 .width(70)
 
                 TableColumn("Priority") { file in
-                    Text(priorityLabel(file.stats?.priority))
+                    Menu {
+                        ForEach(FilePriority.allCases) { priority in
+                            Button {
+                                Task {
+                                    await appModel.setTorrentFilePriority(fileID: file.id, priority: priority)
+                                }
+                            } label: {
+                                if file.stats?.priorityLevel == priority {
+                                    Label(priority.title, systemImage: "checkmark")
+                                } else {
+                                    Text(priority.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Text(file.stats?.priorityLevel.title ?? "Unknown")
+                    }
+                    .menuStyle(.button)
+                    .controlSize(.small)
                 }
-                .width(min: 70, ideal: 90)
+                .width(min: 92, ideal: 110)
             }
         } else {
             ContentUnavailableView("No Files", systemImage: "doc.on.doc")
-        }
-    }
-
-    private func priorityLabel(_ priority: Int?) -> String {
-        switch priority {
-        case 1:
-            "High"
-        case -1:
-            "Low"
-        case 0:
-            "Normal"
-        default:
-            "Unknown"
         }
     }
 }

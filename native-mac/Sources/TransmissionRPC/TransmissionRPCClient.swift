@@ -73,6 +73,33 @@ public final class TransmissionRPCClient: Sendable {
         let _: EmptyArguments = try await call(method: "torrent-remove", arguments: arguments)
     }
 
+    public func setTorrentPriority(id: Int, priority: BandwidthPriority) async throws {
+        let arguments = TorrentSetArguments(ids: [id], bandwidthPriority: priority.rawValue)
+        let _: EmptyArguments = try await call(method: "torrent-set", arguments: arguments)
+    }
+
+    public func setFileWanted(torrentID: Int, fileIDs: [Int], wanted: Bool) async throws {
+        let arguments = TorrentSetArguments(
+            ids: [torrentID],
+            filesWanted: wanted ? fileIDs : nil,
+            filesUnwanted: wanted ? nil : fileIDs
+        )
+        let _: EmptyArguments = try await call(method: "torrent-set", arguments: arguments)
+    }
+
+    public func setFilePriority(torrentID: Int, fileIDs: [Int], priority: FilePriority) async throws {
+        let arguments: TorrentSetArguments
+        switch priority {
+        case .low:
+            arguments = TorrentSetArguments(ids: [torrentID], priorityLow: fileIDs)
+        case .normal:
+            arguments = TorrentSetArguments(ids: [torrentID], priorityNormal: fileIDs)
+        case .high:
+            arguments = TorrentSetArguments(ids: [torrentID], priorityHigh: fileIDs)
+        }
+        let _: EmptyArguments = try await call(method: "torrent-set", arguments: arguments)
+    }
+
     public func addMagnet(_ magnetLink: String, downloadDirectory: String? = nil) async throws -> TorrentAddResult {
         let arguments = TorrentAddArguments(filename: magnetLink, downloadDirectory: downloadDirectory)
         return try await call(method: "torrent-add", arguments: arguments)
@@ -191,6 +218,26 @@ private struct TorrentRemoveArguments: Encodable {
     enum CodingKeys: String, CodingKey {
         case ids
         case deleteLocalData = "delete-local-data"
+    }
+}
+
+private struct TorrentSetArguments: Encodable {
+    let ids: [Int]
+    var bandwidthPriority: Int?
+    var filesWanted: [Int]?
+    var filesUnwanted: [Int]?
+    var priorityHigh: [Int]?
+    var priorityNormal: [Int]?
+    var priorityLow: [Int]?
+
+    enum CodingKeys: String, CodingKey {
+        case ids
+        case bandwidthPriority
+        case filesWanted = "files-wanted"
+        case filesUnwanted = "files-unwanted"
+        case priorityHigh = "priority-high"
+        case priorityNormal = "priority-normal"
+        case priorityLow = "priority-low"
     }
 }
 
