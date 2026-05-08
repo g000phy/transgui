@@ -58,3 +58,6 @@ Release/
 
 # SwiftPM build output for the native macOS rewrite
 /native-mac/.build/
+
+# Project-local app bundles produced by script/build_and_run.sh
+/dist/

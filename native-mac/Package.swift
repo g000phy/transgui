@@ -23,7 +23,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "TransmissionRemoteMac",
-            dependencies: ["TransmissionRPC"]
+            dependencies: ["TransmissionRPC"],
+            linkerSettings: [
+                .linkedFramework("Security")
+            ]
         ),
         .testTarget(
             name: "TransmissionRPCTests",
