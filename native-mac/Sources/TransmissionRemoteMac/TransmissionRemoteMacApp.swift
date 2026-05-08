@@ -19,6 +19,16 @@ struct TransmissionRemoteMacApp: App {
         .commands {
             SidebarCommands()
             ToolbarCommands()
+            CommandGroup(replacing: .appSettings) {
+                SettingsLink {
+                    Text("Settings...")
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
+
+        Settings {
+            SettingsView()
         }
     }
 }

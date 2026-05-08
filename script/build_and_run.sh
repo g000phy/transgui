@@ -5,7 +5,7 @@ MODE="${1:-run}"
 APP_NAME="TransmissionRemoteMac"
 BUNDLE_ID="com.g000phy.TransmissionRemoteMac"
 MIN_SYSTEM_VERSION="15.0"
-VERSION="0.1.2"
+VERSION="0.1.3"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SWIFT_DIR="$ROOT_DIR/native-mac"
@@ -98,14 +98,44 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>
+      <key>CFBundleTypeIconFile</key>
+      <string>${ICON_NAME%.icns}</string>
       <key>CFBundleTypeExtensions</key>
       <array>
         <string>torrent</string>
+      </array>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>org.bittorrent.torrent</string>
       </array>
       <key>CFBundleTypeName</key>
       <string>Torrent File</string>
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
+    </dict>
+  </array>
+  <key>UTImportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>org.bittorrent.torrent</string>
+      <key>UTTypeDescription</key>
+      <string>BitTorrent File</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>torrent</string>
+        </array>
+        <key>public.mime-type</key>
+        <array>
+          <string>application/x-bittorrent</string>
+        </array>
+      </dict>
     </dict>
   </array>
   <key>CFBundleURLTypes</key>
