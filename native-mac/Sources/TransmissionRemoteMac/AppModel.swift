@@ -13,7 +13,7 @@ final class AppModel {
     var isConnectionSettingsPresented = false
     var isAddTorrentPresented = false
     var isSpeedSettingsPresented = false
-    var isRemoveConfirmationPresented = false
+    var pendingRemoval: TorrentRemovalRequest?
     var magnetLinkDraft = ""
     var torrents: [Torrent] = Torrent.previewData
     var selectedTorrentDetails: TorrentDetails?
@@ -205,12 +205,35 @@ final class AppModel {
     }
 
     func startSelectedTorrent() async {
-        guard let selectedTorrentID, let rpcClient else {
+        guard let selectedTorrentID else {
+            return
+        }
+
+        await startTorrent(id: selectedTorrentID)
+    }
+
+    func startTorrent(id: Torrent.ID) async {
+        guard let rpcClient else {
             return
         }
 
         do {
-            try await rpcClient.startTorrent(ids: [selectedTorrentID])
+            try await rpcClient.startTorrent(ids: [id])
+            selectedTorrentID = id
+            await refreshTorrents()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func forceStartTorrent(id: Torrent.ID) async {
+        guard let rpcClient else {
+            return
+        }
+
+        do {
+            try await rpcClient.forceStartTorrent(ids: [id])
+            selectedTorrentID = id
             await refreshTorrents()
         } catch {
             connectionState = .failed(message: error.localizedDescription)
@@ -218,12 +241,49 @@ final class AppModel {
     }
 
     func stopSelectedTorrent() async {
-        guard let selectedTorrentID, let rpcClient else {
+        guard let selectedTorrentID else {
+            return
+        }
+
+        await stopTorrent(id: selectedTorrentID)
+    }
+
+    func stopTorrent(id: Torrent.ID) async {
+        guard let rpcClient else {
             return
         }
 
         do {
-            try await rpcClient.stopTorrent(ids: [selectedTorrentID])
+            try await rpcClient.stopTorrent(ids: [id])
+            selectedTorrentID = id
+            await refreshTorrents()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func reannounceTorrent(id: Torrent.ID) async {
+        guard let rpcClient else {
+            return
+        }
+
+        do {
+            try await rpcClient.reannounceTorrent(ids: [id])
+            selectedTorrentID = id
+            await refreshTorrents()
+        } catch {
+            connectionState = .failed(message: error.localizedDescription)
+        }
+    }
+
+    func verifyTorrent(id: Torrent.ID) async {
+        guard let rpcClient else {
+            return
+        }
+
+        do {
+            try await rpcClient.verifyTorrent(ids: [id])
+            selectedTorrentID = id
             await refreshTorrents()
         } catch {
             connectionState = .failed(message: error.localizedDescription)
@@ -289,14 +349,46 @@ final class AppModel {
         }
     }
 
-    func removeSelectedTorrent(deleteLocalData: Bool = false) async {
-        guard let selectedTorrentID, let rpcClient else {
+    func requestRemoveSelectedTorrent(deleteLocalData: Bool = false) {
+        guard let selectedTorrentID else {
+            return
+        }
+
+        requestRemoveTorrent(id: selectedTorrentID, deleteLocalData: deleteLocalData)
+    }
+
+    func requestRemoveTorrent(id: Torrent.ID, deleteLocalData: Bool) {
+        let torrentName = torrents.first { $0.id == id }?.name
+        selectedTorrentID = id
+        pendingRemoval = TorrentRemovalRequest(
+            torrentIDs: [id],
+            torrentName: torrentName,
+            deleteLocalData: deleteLocalData
+        )
+    }
+
+    func removePendingTorrents() async {
+        guard let pendingRemoval else {
+            return
+        }
+
+        await removeTorrents(
+            ids: pendingRemoval.torrentIDs,
+            deleteLocalData: pendingRemoval.deleteLocalData
+        )
+        self.pendingRemoval = nil
+    }
+
+    private func removeTorrents(ids: [Torrent.ID], deleteLocalData: Bool) async {
+        guard let rpcClient else {
             return
         }
 
         do {
-            try await rpcClient.removeTorrent(ids: [selectedTorrentID], deleteLocalData: deleteLocalData)
-            self.selectedTorrentID = nil
+            try await rpcClient.removeTorrent(ids: ids, deleteLocalData: deleteLocalData)
+            if let selectedTorrentID, ids.contains(selectedTorrentID) {
+                self.selectedTorrentID = nil
+            }
             await refreshTorrents()
         } catch {
             connectionState = .failed(message: error.localizedDescription)
@@ -304,12 +396,21 @@ final class AppModel {
     }
 
     func setSelectedTorrentPriority(_ priority: BandwidthPriority) async {
-        guard let selectedTorrentID, let rpcClient else {
+        guard let selectedTorrentID else {
+            return
+        }
+
+        await setTorrentPriority(id: selectedTorrentID, priority: priority)
+    }
+
+    func setTorrentPriority(id: Torrent.ID, priority: BandwidthPriority) async {
+        guard let rpcClient else {
             return
         }
 
         do {
-            try await rpcClient.setTorrentPriority(id: selectedTorrentID, priority: priority)
+            try await rpcClient.setTorrentPriority(id: id, priority: priority)
+            selectedTorrentID = id
             await refreshTorrents()
         } catch {
             connectionState = .failed(message: error.localizedDescription)
@@ -348,6 +449,21 @@ enum ConnectionState: Equatable {
     case connecting
     case connected(serverName: String)
     case failed(message: String)
+}
+
+struct TorrentRemovalRequest: Identifiable, Equatable {
+    let id = UUID()
+    let torrentIDs: [Torrent.ID]
+    let torrentName: String?
+    let deleteLocalData: Bool
+
+    var title: String {
+        deleteLocalData ? "Remove Torrent and Data" : "Remove Torrent"
+    }
+
+    var actionTitle: String {
+        deleteLocalData ? "Remove and delete data" : "Remove from list"
+    }
 }
 
 enum TorrentFilter: String, CaseIterable, Identifiable {

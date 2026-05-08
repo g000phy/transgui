@@ -64,8 +64,20 @@ public final class TransmissionRPCClient: Sendable {
         let _: EmptyArguments = try await call(method: "torrent-start", arguments: TorrentIDs(ids: ids))
     }
 
+    public func forceStartTorrent(ids: [Int]) async throws {
+        let _: EmptyArguments = try await call(method: "torrent-start-now", arguments: TorrentIDs(ids: ids))
+    }
+
     public func stopTorrent(ids: [Int]) async throws {
         let _: EmptyArguments = try await call(method: "torrent-stop", arguments: TorrentIDs(ids: ids))
+    }
+
+    public func reannounceTorrent(ids: [Int]) async throws {
+        let _: EmptyArguments = try await call(method: "torrent-reannounce", arguments: TorrentIDs(ids: ids))
+    }
+
+    public func verifyTorrent(ids: [Int]) async throws {
+        let _: EmptyArguments = try await call(method: "torrent-verify", arguments: TorrentIDs(ids: ids))
     }
 
     public func removeTorrent(ids: [Int], deleteLocalData: Bool) async throws {

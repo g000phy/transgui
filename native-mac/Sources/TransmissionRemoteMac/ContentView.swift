@@ -23,7 +23,19 @@ struct ContentView: View {
         } content: {
             TorrentTable(
                 torrents: appModel.visibleTorrents,
-                selectedTorrentID: $appModel.selectedTorrentID
+                selectedTorrentID: $appModel.selectedTorrentID,
+                canRunTorrentCommand: appModel.isConnected,
+                start: { id in Task { await appModel.startTorrent(id: id) } },
+                forceStart: { id in Task { await appModel.forceStartTorrent(id: id) } },
+                stop: { id in Task { await appModel.stopTorrent(id: id) } },
+                remove: { id, deleteLocalData in
+                    appModel.requestRemoveTorrent(id: id, deleteLocalData: deleteLocalData)
+                },
+                setPriority: { id, priority in
+                    Task { await appModel.setTorrentPriority(id: id, priority: priority) }
+                },
+                reannounce: { id in Task { await appModel.reannounceTorrent(id: id) } },
+                verify: { id in Task { await appModel.verifyTorrent(id: id) } }
             )
             .navigationTitle(appModel.selectedFilter.title)
             .navigationSplitViewColumnWidth(min: 520, ideal: 640, max: 760)
@@ -77,23 +89,27 @@ struct ContentView: View {
             }
         }
         .confirmationDialog(
-            "Remove Torrent",
-            isPresented: $appModel.isRemoveConfirmationPresented,
+            appModel.pendingRemoval?.title ?? "Remove Torrent",
+            isPresented: Binding(
+                get: { appModel.pendingRemoval != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        appModel.pendingRemoval = nil
+                    }
+                }
+            ),
             titleVisibility: .visible
         ) {
-            Button("Remove from list", role: .destructive) {
-                Task { await appModel.removeSelectedTorrent(deleteLocalData: false) }
-            }
-
-            Button("Remove and delete data", role: .destructive) {
-                Task { await appModel.removeSelectedTorrent(deleteLocalData: true) }
+            Button(appModel.pendingRemoval?.actionTitle ?? "Remove", role: .destructive) {
+                Task { await appModel.removePendingTorrents() }
             }
 
             Button("Cancel", role: .cancel) {
+                appModel.pendingRemoval = nil
             }
         } message: {
-            if let selectedTorrent = appModel.selectedTorrent {
-                Text(selectedTorrent.name)
+            if let pendingRemoval = appModel.pendingRemoval {
+                Text(pendingRemoval.torrentName ?? "Selected torrent")
             }
         }
         .toolbar {
@@ -159,7 +175,7 @@ struct ContentView: View {
                 .disabled(!appModel.canRunTorrentCommand)
 
                 Button(role: .destructive) {
-                    appModel.isRemoveConfirmationPresented = true
+                    appModel.requestRemoveSelectedTorrent()
                 } label: {
                     Label("Remove", systemImage: "trash")
                 }

@@ -105,6 +105,7 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+xattr -cr "$APP_BUNDLE" 2>/dev/null || true
 codesign --force --sign - "$APP_BUNDLE" >/dev/null
 
 open_app() {

@@ -300,6 +300,27 @@ struct TransmissionRPCClientTests {
         #expect(priorityRequest.arguments.priorityLow == [2])
     }
 
+    @Test
+    func sendsAdditionalTorrentCommands() async throws {
+        MockURLProtocol.responses = [
+            successResponse(),
+            successResponse(),
+            successResponse()
+        ]
+
+        let client = TransmissionRPCClient(server: server, urlSession: mockSession)
+        try await client.forceStartTorrent(ids: [7])
+        try await client.reannounceTorrent(ids: [7])
+        try await client.verifyTorrent(ids: [7])
+
+        let requests = try MockURLProtocol.requestBodies.map { body in
+            try JSONDecoder().decode(TorrentIDsRequest.self, from: try #require(body))
+        }
+
+        #expect(requests.map(\.method) == ["torrent-start-now", "torrent-reannounce", "torrent-verify"])
+        #expect(requests.allSatisfy { $0.arguments.ids == [7] })
+    }
+
     private var server: TransmissionServer {
         TransmissionServer(rpcURL: URL(string: "http://example.test/transmission/rpc")!)
     }
@@ -444,6 +465,15 @@ private struct TorrentSetRequest: Decodable {
             case filesUnwanted = "files-unwanted"
             case priorityLow = "priority-low"
         }
+    }
+}
+
+private struct TorrentIDsRequest: Decodable {
+    let method: String
+    let arguments: Arguments
+
+    struct Arguments: Decodable {
+        let ids: [Int]
     }
 }
 
