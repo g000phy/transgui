@@ -5,35 +5,67 @@ struct TorrentInspector: View {
     let torrent: Torrent?
     let details: TorrentDetails?
     let isLoading: Bool
+    @State private var selectedTab: InspectorTab = .info
 
     var body: some View {
         Group {
             if let torrent {
-                TabView {
-                    TorrentOverviewView(torrent: torrent, details: details, isLoading: isLoading)
-                        .tabItem {
-                            Label("Info", systemImage: "info.circle")
+                VStack(spacing: 0) {
+                    Picker("Inspector Section", selection: $selectedTab) {
+                        ForEach(InspectorTab.allCases) { tab in
+                            Text(tab.title)
+                                .tag(tab)
                         }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 10)
 
-                    TorrentFilesView(details: details)
-                        .tabItem {
-                            Label("Files", systemImage: "doc.on.doc")
-                        }
-
-                    TorrentTrackersView(details: details)
-                        .tabItem {
-                            Label("Trackers", systemImage: "antenna.radiowaves.left.and.right")
-                        }
-
-                    TorrentPeersView(details: details)
-                        .tabItem {
-                            Label("Peers", systemImage: "person.2")
-                        }
+                    selectedContent(for: torrent)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .navigationTitle("Details")
             } else {
                 ContentUnavailableView("No Torrent Selected", systemImage: "tray")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func selectedContent(for torrent: Torrent) -> some View {
+        switch selectedTab {
+        case .info:
+            TorrentOverviewView(torrent: torrent, details: details, isLoading: isLoading)
+        case .files:
+            TorrentFilesView(details: details)
+        case .trackers:
+            TorrentTrackersView(details: details)
+        case .peers:
+            TorrentPeersView(details: details)
+        }
+    }
+}
+
+private enum InspectorTab: String, CaseIterable, Identifiable {
+    case info
+    case files
+    case trackers
+    case peers
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .info:
+            "Info"
+        case .files:
+            "Files"
+        case .trackers:
+            "Trackers"
+        case .peers:
+            "Peers"
         }
     }
 }
