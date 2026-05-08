@@ -206,14 +206,30 @@ private struct TorrentFilesView: View {
                 .width(70)
 
                 TableColumn("Priority") { file in
+                    let isWanted = file.stats?.wanted ?? true
+
                     Menu {
+                        Button {
+                            Task {
+                                await appModel.setTorrentFileWanted(fileID: file.id, wanted: false)
+                            }
+                        } label: {
+                            if !isWanted {
+                                Label("Don't Download", systemImage: "checkmark")
+                            } else {
+                                Text("Don't Download")
+                            }
+                        }
+
+                        Divider()
+
                         ForEach(FilePriority.allCases) { priority in
                             Button {
                                 Task {
                                     await appModel.setTorrentFilePriority(fileID: file.id, priority: priority)
                                 }
                             } label: {
-                                if file.stats?.priorityLevel == priority {
+                                if isWanted && file.stats?.priorityLevel == priority {
                                     Label(priority.title, systemImage: "checkmark")
                                 } else {
                                     Text(priority.title)
@@ -221,7 +237,7 @@ private struct TorrentFilesView: View {
                             }
                         }
                     } label: {
-                        Text(file.stats?.priorityLevel.title ?? "Unknown")
+                        Text(isWanted ? file.stats?.priorityLevel.title ?? "Normal" : "Don't Download")
                     }
                     .menuStyle(.button)
                     .controlSize(.small)

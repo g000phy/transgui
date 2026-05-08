@@ -457,6 +457,7 @@ final class AppModel {
         }
 
         do {
+            try await rpcClient.setFileWanted(torrentID: selectedTorrentID, fileIDs: [fileID], wanted: true)
             try await rpcClient.setFilePriority(torrentID: selectedTorrentID, fileIDs: [fileID], priority: priority)
             await loadSelectedTorrentDetails()
         } catch {

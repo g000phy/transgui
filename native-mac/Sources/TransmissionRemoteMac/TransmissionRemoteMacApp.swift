@@ -11,7 +11,7 @@ struct TransmissionRemoteMacApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("Transmission Remote Mac", id: "main") {
             ContentView()
                 .environment(appModel)
                 .frame(minWidth: 980, minHeight: 640)
