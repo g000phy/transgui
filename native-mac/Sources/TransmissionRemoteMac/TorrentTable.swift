@@ -14,102 +14,85 @@ struct TorrentTable: View {
     let verify: (Torrent.ID) -> Void
 
     var body: some View {
-        Table(torrents, selection: $selectedTorrentID) {
-            TableColumn("Name") { torrent in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(torrent.name)
-                        .lineLimit(1)
+        GeometryReader { proxy in
+            let layout = TorrentTableLayout(width: proxy.size.width)
 
-                    ProgressView(value: torrent.percentDone)
-                        .controlSize(.small)
-                }
-                .padding(.vertical, 4)
-            }
-            .width(min: 150, ideal: 180, max: .infinity)
+            VStack(spacing: 0) {
+                header(layout: layout)
+                    .frame(height: 30)
+                    .padding(.horizontal, 8)
 
-            TableColumn("Size") { torrent in
-                Text(ByteFormat.compactFileSize(torrent.totalSize))
-                    .monospacedDigit()
-            }
-            .width(min: 60, ideal: 64, max: 120)
+                Divider()
 
-            TableColumn("Size left") { torrent in
-                Text(ByteFormat.compactFileSize(torrent.leftUntilDone))
-                    .monospacedDigit()
-            }
-            .width(min: 68, ideal: 72, max: 130)
-
-            TableColumn("Status") { torrent in
-                Text(torrent.status.displayName)
-                    .foregroundStyle(torrent.status == .unknown ? .secondary : .primary)
-                    .lineLimit(1)
-            }
-            .width(min: 80, ideal: 90, max: .infinity)
-
-            TableColumn("Seeds") { torrent in
-                Text(count(torrent.seedCount))
-                    .monospacedDigit()
-            }
-            .width(min: 45, ideal: 50, max: 90)
-
-            TableColumn("Peers") { torrent in
-                Text(count(torrent.peerCount))
-                    .monospacedDigit()
-            }
-            .width(min: 45, ideal: 50, max: 90)
-
-            Group {
-                TableColumn("Down speed") { (torrent: Torrent) in
-                    Text(ByteFormat.compactTransferRate(torrent.rateDownload))
-                        .monospacedDigit()
-                }
-                .width(min: 72, ideal: 78, max: .infinity)
-
-                TableColumn("Up speed") { (torrent: Torrent) in
-                    Text(ByteFormat.compactTransferRate(torrent.rateUpload))
-                        .monospacedDigit()
-                }
-                .width(min: 70, ideal: 74, max: .infinity)
-
-                TableColumn("ETA") { (torrent: Torrent) in
-                    Text(eta(torrent))
-                        .monospacedDigit()
-                }
-                .width(min: 56, ideal: 60, max: 120)
-
-                TableColumn("Ratio") { (torrent: Torrent) in
-                    Text(ratio(torrent.uploadRatio))
-                        .monospacedDigit()
-                        .foregroundStyle(ratioColor(torrent.uploadRatio))
-                }
-                .width(min: 52, ideal: 56, max: 100)
-
-                TableColumn("Priority") { (torrent: Torrent) in
-                    Menu {
-                        ForEach(BandwidthPriority.allCases) { priority in
-                            Button {
-                                setPriority(torrent.id, priority)
-                            } label: {
-                                if torrent.bandwidthPriority == priority {
-                                    Label(priority.title, systemImage: "checkmark")
-                                } else {
-                                    Text(priority.title)
-                                }
-                            }
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(torrents) { torrent in
+                            row(torrent, layout: layout)
+                                .padding(.horizontal, 8)
                         }
-                    } label: {
-                        Text(torrent.bandwidthPriority?.title ?? "Normal")
                     }
-                    .menuStyle(.button)
-                    .controlSize(.small)
-                    .disabled(!canRunTorrentCommand)
+                    .padding(.vertical, 6)
                 }
-                .width(min: 80, ideal: 84, max: 150)
             }
         }
-        .contextMenu(forSelectionType: Torrent.ID.self) { selection in
+    }
+
+    private func header(layout: TorrentTableLayout) -> some View {
+        HStack(spacing: 0) {
+            headerCell("Name", width: layout.name)
+            headerCell("Size", width: layout.size)
+            headerCell("Size left", width: layout.sizeLeft)
+            headerCell("Status", width: layout.status)
+            headerCell("Seeds", width: layout.seeds)
+            headerCell("Peers", width: layout.peers)
+            headerCell("Down speed", width: layout.downSpeed)
+            headerCell("Up speed", width: layout.upSpeed)
+            headerCell("ETA", width: layout.eta)
+            headerCell("Ratio", width: layout.ratio)
+            headerCell("Priority", width: layout.priority)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    private func row(_ torrent: Torrent, layout: TorrentTableLayout) -> some View {
+        let isSelected = selectedTorrentID == torrent.id
+
+        return ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor : Color.clear)
+
+            VStack(spacing: 6) {
+                HStack(spacing: 0) {
+                    rowCell(torrent.name, width: layout.name, isSelected: isSelected)
+                    rowCell(ByteFormat.compactFileSize(torrent.totalSize), width: layout.size, isSelected: isSelected, monospaced: true)
+                    rowCell(ByteFormat.compactFileSize(torrent.leftUntilDone), width: layout.sizeLeft, isSelected: isSelected, monospaced: true)
+                    rowCell(torrent.status.displayName, width: layout.status, isSelected: isSelected)
+                    rowCell(count(torrent.seedCount), width: layout.seeds, isSelected: isSelected, monospaced: true)
+                    rowCell(count(torrent.peerCount), width: layout.peers, isSelected: isSelected, monospaced: true)
+                    rowCell(ByteFormat.compactTransferRate(torrent.rateDownload), width: layout.downSpeed, isSelected: isSelected, monospaced: true)
+                    rowCell(ByteFormat.compactTransferRate(torrent.rateUpload), width: layout.upSpeed, isSelected: isSelected, monospaced: true)
+                    rowCell(eta(torrent), width: layout.eta, isSelected: isSelected, monospaced: true)
+                    rowCell(ratio(torrent.uploadRatio), width: layout.ratio, isSelected: isSelected, color: isSelected ? .white : ratioColor(torrent.uploadRatio), monospaced: true)
+
+                    priorityMenu(for: torrent)
+                        .frame(width: layout.priority, alignment: .leading)
+                }
+
+                FullWidthProgressBar(value: torrent.percentDone, isSelected: isSelected)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+        }
+        .frame(height: 56)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedTorrentID = torrent.id
+        }
+        .contextMenu {
             TorrentContextMenu(
-                torrentID: selection.first ?? selectedTorrentID,
+                torrentID: torrent.id,
                 canRunTorrentCommand: canRunTorrentCommand,
                 start: start,
                 forceStart: forceStart,
@@ -120,6 +103,49 @@ struct TorrentTable: View {
                 verify: verify
             )
         }
+    }
+
+    private func headerCell(_ title: String, width: CGFloat) -> some View {
+        Text(title)
+            .lineLimit(1)
+            .frame(width: width, alignment: .leading)
+    }
+
+    private func rowCell(
+        _ title: String,
+        width: CGFloat,
+        isSelected: Bool,
+        color: Color? = nil,
+        monospaced: Bool = false
+    ) -> some View {
+        Text(title)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .font(monospaced ? .body.monospacedDigit() : .body)
+            .foregroundStyle(color ?? (isSelected ? Color.white : Color.primary))
+            .frame(width: width, alignment: .leading)
+    }
+
+    private func priorityMenu(for torrent: Torrent) -> some View {
+        Menu {
+            ForEach(BandwidthPriority.allCases) { priority in
+                Button {
+                    setPriority(torrent.id, priority)
+                } label: {
+                    if torrent.bandwidthPriority == priority {
+                        Label(priority.title, systemImage: "checkmark")
+                    } else {
+                        Text(priority.title)
+                    }
+                }
+            }
+        } label: {
+            Text(torrent.bandwidthPriority?.title ?? "Normal")
+                .lineLimit(1)
+        }
+        .menuStyle(.button)
+        .controlSize(.small)
+        .disabled(!canRunTorrentCommand)
     }
 
     private func count(_ value: Int?) -> String {
@@ -166,6 +192,69 @@ struct TorrentTable: View {
         }
 
         return .green
+    }
+}
+
+private struct FullWidthProgressBar: View {
+    let value: Double
+    let isSelected: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            Capsule()
+                .fill(isSelected ? .white.opacity(0.28) : .secondary.opacity(0.15))
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(isSelected ? .white.opacity(0.92) : Color.accentColor)
+                        .frame(width: proxy.size.width * min(max(value, 0), 1))
+                }
+        }
+        .frame(height: 4)
+    }
+}
+
+private struct TorrentTableLayout {
+    let name: CGFloat
+    let size: CGFloat
+    let sizeLeft: CGFloat
+    let status: CGFloat
+    let seeds: CGFloat
+    let peers: CGFloat
+    let downSpeed: CGFloat
+    let upSpeed: CGFloat
+    let eta: CGFloat
+    let ratio: CGFloat
+    let priority: CGFloat
+
+    init(width: CGFloat) {
+        let base: [CGFloat] = [180, 64, 72, 90, 50, 50, 78, 74, 60, 56, 84]
+        let minimum: [CGFloat] = [150, 60, 68, 80, 45, 45, 72, 70, 56, 52, 80]
+        let baseTotal = base.reduce(0, +)
+        let minimumTotal = minimum.reduce(0, +)
+        let available = max(width - 16, minimumTotal)
+
+        let values: [CGFloat]
+        if available >= baseTotal {
+            let scale = available / baseTotal
+            values = base.map { $0 * scale }
+        } else {
+            let progress = max(0, min(1, (available - minimumTotal) / (baseTotal - minimumTotal)))
+            values = zip(minimum, base).map { minValue, baseValue in
+                minValue + (baseValue - minValue) * progress
+            }
+        }
+
+        self.name = values[0]
+        self.size = values[1]
+        self.sizeLeft = values[2]
+        self.status = values[3]
+        self.seeds = values[4]
+        self.peers = values[5]
+        self.downSpeed = values[6]
+        self.upSpeed = values[7]
+        self.eta = values[8]
+        self.ratio = values[9]
+        self.priority = values[10]
     }
 }
 
