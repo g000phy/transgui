@@ -19,7 +19,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: .infinity)
         } content: {
             TorrentTable(
                 torrents: appModel.visibleTorrents,
@@ -38,14 +38,14 @@ struct ContentView: View {
                 verify: { id in Task { await appModel.verifyTorrent(id: id) } }
             )
             .navigationTitle(appModel.selectedFilter.title)
-            .navigationSplitViewColumnWidth(min: 520, ideal: 640, max: 760)
+            .navigationSplitViewColumnWidth(min: 520, ideal: 720, max: .infinity)
         } detail: {
             TorrentInspector(
                 torrent: appModel.selectedTorrent,
                 details: appModel.selectedTorrentDetails,
                 isLoading: appModel.isLoadingTorrentDetails
             )
-                .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 560)
+                .navigationSplitViewColumnWidth(min: 360, ideal: 560, max: .infinity)
         }
         .task(id: appModel.selectedTorrentID) {
             await appModel.loadSelectedTorrentDetails()

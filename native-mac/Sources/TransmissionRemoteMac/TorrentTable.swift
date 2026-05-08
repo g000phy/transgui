@@ -25,30 +25,31 @@ struct TorrentTable: View {
                 }
                 .padding(.vertical, 4)
             }
+            .width(min: 180, ideal: 220, max: .infinity)
 
             TableColumn("Status") { torrent in
                 Text(torrent.status.displayName)
                     .foregroundStyle(torrent.status == .unknown ? .secondary : .primary)
             }
-            .width(min: 110, ideal: 130)
+            .width(min: 110, ideal: 120, max: .infinity)
 
             TableColumn("Down") { torrent in
                 Text(ByteFormat.transferRate(torrent.rateDownload))
                     .monospacedDigit()
             }
-            .width(min: 90, ideal: 110)
+            .width(min: 90, ideal: 100, max: .infinity)
 
             TableColumn("Up") { torrent in
                 Text(ByteFormat.transferRate(torrent.rateUpload))
                     .monospacedDigit()
             }
-            .width(min: 90, ideal: 110)
+            .width(min: 90, ideal: 100, max: .infinity)
 
             TableColumn("Size") { torrent in
                 Text(ByteFormat.fileSize(torrent.totalSize))
                     .monospacedDigit()
             }
-            .width(min: 90, ideal: 110)
+            .width(min: 90, ideal: 100, max: .infinity)
         }
         .contextMenu(forSelectionType: Torrent.ID.self) { selection in
             TorrentContextMenu(

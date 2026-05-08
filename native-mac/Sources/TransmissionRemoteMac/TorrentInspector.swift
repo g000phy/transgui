@@ -181,12 +181,13 @@ private struct TorrentFilesView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .width(min: 180, ideal: 220, max: .infinity)
 
                 TableColumn("Size") { file in
                     Text(ByteFormat.fileSize(file.file.length))
                         .monospacedDigit()
                 }
-                .width(min: 86, ideal: 104)
+                .width(min: 86, ideal: 100, max: .infinity)
 
                 TableColumn("Wanted") { file in
                     Button {
@@ -203,7 +204,7 @@ private struct TorrentFilesView: View {
                     .buttonStyle(.plain)
                     .help(file.stats?.wanted == false ? "Download this file" : "Skip this file")
                 }
-                .width(70)
+                .width(min: 70, ideal: 80, max: 130)
 
                 TableColumn("Priority") { file in
                     let isWanted = file.stats?.wanted ?? true
@@ -242,7 +243,7 @@ private struct TorrentFilesView: View {
                     .menuStyle(.button)
                     .controlSize(.small)
                 }
-                .width(min: 92, ideal: 110)
+                .width(min: 130, ideal: 150, max: 260)
             }
         } else {
             ContentUnavailableView("No Files", systemImage: "doc.on.doc")
@@ -262,25 +263,26 @@ private struct TorrentTrackersView: View {
                     Text(row.name)
                         .lineLimit(1)
                 }
+                .width(min: 180, ideal: 220, max: .infinity)
 
                 TableColumn("Status") { row in
                     Text(row.status)
                         .foregroundStyle(row.isError ? .red : .primary)
                         .lineLimit(1)
                 }
-                .width(min: 110, ideal: 150)
+                .width(min: 110, ideal: 130, max: .infinity)
 
                 TableColumn("Update in") { row in
                     Text(row.updateIn)
                         .monospacedDigit()
                 }
-                .width(min: 100, ideal: 120)
+                .width(min: 100, ideal: 110, max: 220)
 
                 TableColumn("Seeds") { row in
                     Text(row.seeds)
                         .monospacedDigit()
                 }
-                .width(min: 70, ideal: 80)
+                .width(min: 70, ideal: 80, max: 150)
             }
         } else {
             ContentUnavailableView("No Trackers", systemImage: "antenna.radiowaves.left.and.right")
@@ -397,24 +399,25 @@ private struct TorrentPeersView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .width(min: 180, ideal: 220, max: .infinity)
 
                 TableColumn("Progress") { peer in
                     Text((peer.progress ?? 0).formatted(.percent.precision(.fractionLength(0))))
                         .monospacedDigit()
                 }
-                .width(min: 76, ideal: 90)
+                .width(min: 76, ideal: 90, max: 160)
 
                 TableColumn("Down") { peer in
                     Text(ByteFormat.transferRate(peer.rateToClient ?? 0))
                         .monospacedDigit()
                 }
-                .width(min: 86, ideal: 100)
+                .width(min: 86, ideal: 100, max: .infinity)
 
                 TableColumn("Up") { peer in
                     Text(ByteFormat.transferRate(peer.rateToPeer ?? 0))
                         .monospacedDigit()
                 }
-                .width(min: 86, ideal: 100)
+                .width(min: 86, ideal: 100, max: .infinity)
             }
         } else {
             ContentUnavailableView("No Peers", systemImage: "person.2")
