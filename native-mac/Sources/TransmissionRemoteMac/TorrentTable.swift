@@ -2,6 +2,13 @@ import SwiftUI
 import TransmissionRPC
 
 struct TorrentTable: View {
+    private static let leadingInset: CGFloat = 8
+    private static let trailingInset: CGFloat = 16
+
+    @State private var columnWidths = TorrentTableColumn.defaultWidths
+    @State private var resizeStartWidths: [TorrentTableColumn: CGFloat] = [:]
+    @State private var userResizedColumns = false
+
     let torrents: [Torrent]
     @Binding var selectedTorrentID: Torrent.ID?
     let canRunTorrentCommand: Bool
@@ -15,14 +22,19 @@ struct TorrentTable: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let layout = TorrentTableLayout(width: proxy.size.width)
+            let layout = TorrentTableLayout(
+                width: proxy.size.width,
+                columnWidths: columnWidths,
+                scalesColumns: !userResizedColumns
+            )
             let bodyHeight = max(proxy.size.height - 31, 0)
 
             ScrollView(.horizontal) {
                 VStack(spacing: 0) {
                     header(layout: layout)
-                        .frame(width: layout.contentWidth, height: 30, alignment: .leading)
-                        .padding(.horizontal, 8)
+                        .frame(width: layout.rowWidth, height: 30, alignment: .leading)
+                        .padding(.leading, Self.leadingInset)
+                        .padding(.trailing, Self.trailingInset)
 
                     Divider()
 
@@ -30,31 +42,27 @@ struct TorrentTable: View {
                         LazyVStack(spacing: 0) {
                             ForEach(torrents) { torrent in
                                 row(torrent, layout: layout)
-                                    .padding(.horizontal, 8)
+                                    .padding(.leading, Self.leadingInset)
+                                    .padding(.trailing, Self.trailingInset)
                             }
                         }
                         .padding(.vertical, 6)
                     }
                     .frame(height: bodyHeight, alignment: .top)
                 }
-                .frame(width: layout.contentWidth + 16, height: proxy.size.height, alignment: .topLeading)
+                .frame(width: layout.tableWidth, height: proxy.size.height, alignment: .topLeading)
             }
         }
     }
 
     private func header(layout: TorrentTableLayout) -> some View {
         HStack(spacing: 0) {
-            headerCell("Name", width: layout.name)
-            headerCell("Size", width: layout.size)
-            headerCell("Size left", width: layout.sizeLeft)
-            headerCell("Status", width: layout.status)
-            headerCell("Seeds", width: layout.seeds)
-            headerCell("Peers", width: layout.peers)
-            headerCell("Down speed", width: layout.downSpeed)
-            headerCell("Up speed", width: layout.upSpeed)
-            headerCell("ETA", width: layout.eta)
-            headerCell("Ratio", width: layout.ratio)
-            headerCell("Priority", width: layout.priority)
+            ForEach(TorrentTableColumn.allCases) { column in
+                headerCell(column, width: layout.width(for: column))
+            }
+
+            Spacer(minLength: 0)
+                .frame(width: layout.trailingGutter)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -63,34 +71,39 @@ struct TorrentTable: View {
     private func row(_ torrent: Torrent, layout: TorrentTableLayout) -> some View {
         let isSelected = selectedTorrentID == torrent.id
 
-        return ZStack {
+        return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected ? Color.accentColor : Color.clear)
+                .frame(width: layout.visibleRowWidth, height: 56)
 
-            VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 0) {
-                    rowCell(torrent.name, width: layout.name, isSelected: isSelected)
-                    rowCell(ByteFormat.compactFileSize(torrent.totalSize), width: layout.size, isSelected: isSelected, monospaced: true)
-                    rowCell(ByteFormat.compactFileSize(torrent.leftUntilDone), width: layout.sizeLeft, isSelected: isSelected, monospaced: true)
-                    rowCell(torrent.status.displayName, width: layout.status, isSelected: isSelected)
-                    rowCell(count(torrent.seedCount), width: layout.seeds, isSelected: isSelected, monospaced: true)
-                    rowCell(count(torrent.peerCount), width: layout.peers, isSelected: isSelected, monospaced: true)
-                    rowCell(ByteFormat.compactTransferRate(torrent.rateDownload), width: layout.downSpeed, isSelected: isSelected, monospaced: true)
-                    rowCell(ByteFormat.compactTransferRate(torrent.rateUpload), width: layout.upSpeed, isSelected: isSelected, monospaced: true)
-                    rowCell(eta(torrent), width: layout.eta, isSelected: isSelected, monospaced: true)
-                    rowCell(ratio(torrent.uploadRatio), width: layout.ratio, isSelected: isSelected, color: isSelected ? .white : ratioColor(torrent.uploadRatio), monospaced: true)
+                    rowCell(torrent.name, width: layout.width(for: .name), isSelected: isSelected)
+                    rowCell(ByteFormat.compactFileSize(torrent.totalSize), width: layout.width(for: .size), isSelected: isSelected, monospaced: true)
+                    rowCell(ByteFormat.compactFileSize(torrent.leftUntilDone), width: layout.width(for: .sizeLeft), isSelected: isSelected, monospaced: true)
+                    rowCell(torrent.status.displayName, width: layout.width(for: .status), isSelected: isSelected)
+                    rowCell(count(torrent.seedCount), width: layout.width(for: .seeds), isSelected: isSelected, monospaced: true)
+                    rowCell(count(torrent.peerCount), width: layout.width(for: .peers), isSelected: isSelected, monospaced: true)
+                    rowCell(ByteFormat.compactTransferRate(torrent.rateDownload), width: layout.width(for: .downSpeed), isSelected: isSelected, monospaced: true)
+                    rowCell(ByteFormat.compactTransferRate(torrent.rateUpload), width: layout.width(for: .upSpeed), isSelected: isSelected, monospaced: true)
+                    rowCell(eta(torrent), width: layout.width(for: .eta), isSelected: isSelected, monospaced: true)
+                    rowCell(ratio(torrent.uploadRatio), width: layout.width(for: .ratio), isSelected: isSelected, color: isSelected ? .white : ratioColor(torrent.uploadRatio), monospaced: true)
 
                     priorityMenu(for: torrent, isSelected: isSelected)
-                        .frame(width: layout.priority, alignment: .leading)
+                        .frame(width: layout.width(for: .priority), alignment: .leading)
+
+                    Spacer(minLength: 0)
+                        .frame(width: layout.trailingGutter)
                 }
 
                 FullWidthProgressBar(value: torrent.percentDone, isSelected: isSelected)
+                    .frame(width: layout.progressWidth, alignment: .leading)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
         }
         .frame(height: 56)
-        .frame(width: layout.contentWidth, alignment: .leading)
+        .frame(width: layout.rowWidth, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture {
             selectedTorrentID = torrent.id
@@ -110,9 +123,31 @@ struct TorrentTable: View {
         }
     }
 
-    private func headerCell(_ title: String, width: CGFloat) -> some View {
-        Text(title)
+    private func headerCell(_ column: TorrentTableColumn, width: CGFloat) -> some View {
+        Text(column.title)
             .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.18))
+                    .frame(width: 1, height: 18)
+                    .padding(.trailing, 4)
+                    .overlay {
+                        Rectangle()
+                            .fill(Color.clear)
+                            .frame(width: 12, height: 30)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 1)
+                                    .onChanged { value in
+                                        resizeColumn(column, translation: value.translation.width)
+                                    }
+                                    .onEnded { _ in
+                                        resizeStartWidths[column] = nil
+                                    }
+                            )
+                    }
+            }
             .frame(width: width, alignment: .leading)
     }
 
@@ -214,6 +249,13 @@ struct TorrentTable: View {
 
         return .green
     }
+
+    private func resizeColumn(_ column: TorrentTableColumn, translation: CGFloat) {
+        let startWidth = resizeStartWidths[column] ?? columnWidths[column, default: column.defaultWidth]
+        resizeStartWidths[column] = startWidth
+        columnWidths[column] = max(column.minimumWidth, startWidth + translation)
+        userResizedColumns = true
+    }
 }
 
 private struct FullWidthProgressBar: View {
@@ -234,45 +276,117 @@ private struct FullWidthProgressBar: View {
     }
 }
 
-private struct TorrentTableLayout {
-    let contentWidth: CGFloat
-    let name: CGFloat
-    let size: CGFloat
-    let sizeLeft: CGFloat
-    let status: CGFloat
-    let seeds: CGFloat
-    let peers: CGFloat
-    let downSpeed: CGFloat
-    let upSpeed: CGFloat
-    let eta: CGFloat
-    let ratio: CGFloat
-    let priority: CGFloat
+private enum TorrentTableColumn: Int, CaseIterable, Identifiable {
+    case name
+    case size
+    case sizeLeft
+    case status
+    case seeds
+    case peers
+    case downSpeed
+    case upSpeed
+    case eta
+    case ratio
+    case priority
 
-    init(width: CGFloat) {
-        let base: [CGFloat] = [460, 70, 80, 96, 50, 50, 84, 78, 60, 56, 90]
-        let baseTotal = base.reduce(0, +)
-        let available = width - 16
+    var id: Self { self }
 
-        let values: [CGFloat]
-        if available >= baseTotal {
-            let scale = available / baseTotal
-            values = base.map { $0 * scale }
-        } else {
-            values = base
+    var title: String {
+        switch self {
+        case .name: "Name"
+        case .size: "Size"
+        case .sizeLeft: "Size left"
+        case .status: "Status"
+        case .seeds: "Seeds"
+        case .peers: "Peers"
+        case .downSpeed: "Down speed"
+        case .upSpeed: "Up speed"
+        case .eta: "ETA"
+        case .ratio: "Ratio"
+        case .priority: "Priority"
         }
+    }
 
-        self.contentWidth = values.reduce(0, +)
-        self.name = values[0]
-        self.size = values[1]
-        self.sizeLeft = values[2]
-        self.status = values[3]
-        self.seeds = values[4]
-        self.peers = values[5]
-        self.downSpeed = values[6]
-        self.upSpeed = values[7]
-        self.eta = values[8]
-        self.ratio = values[9]
-        self.priority = values[10]
+    var defaultWidth: CGFloat {
+        switch self {
+        case .name: 460
+        case .size: 70
+        case .sizeLeft: 80
+        case .status: 96
+        case .seeds: 50
+        case .peers: 50
+        case .downSpeed: 84
+        case .upSpeed: 78
+        case .eta: 60
+        case .ratio: 56
+        case .priority: 90
+        }
+    }
+
+    var minimumWidth: CGFloat {
+        switch self {
+        case .name: 160
+        case .size, .sizeLeft, .downSpeed, .upSpeed, .priority: 64
+        case .status: 72
+        case .seeds, .peers, .eta, .ratio: 44
+        }
+    }
+
+    static let defaultWidths: [TorrentTableColumn: CGFloat] = {
+        Dictionary(uniqueKeysWithValues: allCases.map { ($0, $0.defaultWidth) })
+    }()
+}
+
+private struct TorrentTableLayout {
+    let tableWidth: CGFloat
+    let rowWidth: CGFloat
+    let visibleRowWidth: CGFloat
+    let contentWidth: CGFloat
+    let progressWidth: CGFloat
+    let trailingGutter: CGFloat
+    private let widths: [TorrentTableColumn: CGFloat]
+
+    init(
+        width: CGFloat,
+        columnWidths: [TorrentTableColumn: CGFloat],
+        scalesColumns: Bool
+    ) {
+        let leadingInset: CGFloat = 8
+        let trailingInset: CGFloat = 16
+        let baseTrailingGutter: CGFloat = 18
+        let visibleRowWidth = max(0, width - leadingInset - trailingInset)
+        let requested = Dictionary(
+            uniqueKeysWithValues: TorrentTableColumn.allCases.map { column in
+                (column, max(column.minimumWidth, columnWidths[column, default: column.defaultWidth]))
+            }
+        )
+        let requestedTotal = TorrentTableColumn.allCases.reduce(0) { total, column in
+            total + requested[column, default: column.defaultWidth]
+        }
+        let available = width - leadingInset - trailingInset - baseTrailingGutter
+        let scale = scalesColumns && available > requestedTotal ? available / requestedTotal : 1
+        let resolved = Dictionary(
+            uniqueKeysWithValues: TorrentTableColumn.allCases.map { column in
+                (column, requested[column, default: column.defaultWidth] * scale)
+            }
+        )
+        let resolvedContentWidth = TorrentTableColumn.allCases.reduce(0) { total, column in
+            total + resolved[column, default: column.defaultWidth]
+        }
+        let resolvedTrailingGutter = max(baseTrailingGutter, visibleRowWidth - resolvedContentWidth)
+        let resolvedRowWidth = max(visibleRowWidth, resolvedContentWidth + resolvedTrailingGutter)
+
+        self.widths = resolved
+        self.visibleRowWidth = visibleRowWidth
+        self.contentWidth = resolvedContentWidth
+        self.progressWidth = max(0, visibleRowWidth - 16)
+        self.trailingGutter = resolvedTrailingGutter
+        self.rowWidth = resolvedRowWidth
+        self.tableWidth = resolvedRowWidth + leadingInset + trailingInset
+    }
+
+    func width(for column: TorrentTableColumn) -> CGFloat {
+        widths[column, default: column.defaultWidth]
     }
 }
 
