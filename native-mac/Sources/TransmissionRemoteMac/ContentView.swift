@@ -38,14 +38,14 @@ struct ContentView: View {
                 verify: { id in Task { await appModel.verifyTorrent(id: id) } }
             )
             .navigationTitle(appModel.selectedFilter.title)
-            .navigationSplitViewColumnWidth(min: 520, ideal: 720, max: .infinity)
+            .navigationSplitViewColumnWidth(min: 640, ideal: 1_040, max: .infinity)
         } detail: {
             TorrentInspector(
                 torrent: appModel.selectedTorrent,
                 details: appModel.selectedTorrentDetails,
                 isLoading: appModel.isLoadingTorrentDetails
             )
-                .navigationSplitViewColumnWidth(min: 360, ideal: 560, max: .infinity)
+                .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 560)
         }
         .task(id: appModel.selectedTorrentID) {
             await appModel.loadSelectedTorrentDetails()

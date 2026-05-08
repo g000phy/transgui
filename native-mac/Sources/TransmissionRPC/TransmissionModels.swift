@@ -76,9 +76,14 @@ public struct Torrent: Identifiable, Decodable, Equatable, Sendable {
     public let status: TorrentStatus
     public let percentDone: Double
     public let totalSize: Int64
+    public let leftUntilDone: Int64?
     public let rateDownload: Int64
     public let rateUpload: Int64
     public let eta: Int?
+    public let uploadRatio: Double?
+    public let peersConnected: Int?
+    public let bandwidthPriority: BandwidthPriority?
+    public let trackerStats: [TrackerStats]?
     public let error: Int?
     public let errorString: String?
 
@@ -92,9 +97,14 @@ public struct Torrent: Identifiable, Decodable, Equatable, Sendable {
         status: TorrentStatus,
         percentDone: Double,
         totalSize: Int64,
+        leftUntilDone: Int64? = nil,
         rateDownload: Int64,
         rateUpload: Int64,
         eta: Int?,
+        uploadRatio: Double? = nil,
+        peersConnected: Int? = nil,
+        bandwidthPriority: BandwidthPriority? = nil,
+        trackerStats: [TrackerStats]? = nil,
         error: Int?,
         errorString: String?
     ) {
@@ -103,11 +113,25 @@ public struct Torrent: Identifiable, Decodable, Equatable, Sendable {
         self.status = status
         self.percentDone = percentDone
         self.totalSize = totalSize
+        self.leftUntilDone = leftUntilDone
         self.rateDownload = rateDownload
         self.rateUpload = rateUpload
         self.eta = eta
+        self.uploadRatio = uploadRatio
+        self.peersConnected = peersConnected
+        self.bandwidthPriority = bandwidthPriority
+        self.trackerStats = trackerStats
         self.error = error
         self.errorString = errorString
+    }
+
+    public var seedCount: Int? {
+        trackerStats?.compactMap(\.seederCount).filter { $0 >= 0 }.max()
+    }
+
+    public var peerCount: Int? {
+        let trackerPeers = trackerStats?.compactMap(\.leecherCount).filter { $0 >= 0 }.max()
+        return trackerPeers ?? peersConnected
     }
 }
 
@@ -154,6 +178,7 @@ public enum TorrentField: String, Sendable {
     case rateDownload
     case rateUpload
     case eta
+    case uploadRatio
     case error
     case errorString
     case uploadedEver
@@ -164,9 +189,14 @@ public enum TorrentField: String, Sendable {
         .status,
         .percentDone,
         .totalSize,
+        .leftUntilDone,
         .rateDownload,
         .rateUpload,
         .eta,
+        .uploadRatio,
+        .peersConnected,
+        .bandwidthPriority,
+        .trackerStats,
         .error,
         .errorString
     ]

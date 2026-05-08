@@ -82,9 +82,21 @@ struct TransmissionRPCClientTests {
                         "status": 4,
                         "percentDone": 0.5,
                         "totalSize": 2048,
+                        "leftUntilDone": 1024,
                         "rateDownload": 100,
                         "rateUpload": 20,
                         "eta": 10,
+                        "uploadRatio": 0.75,
+                        "peersConnected": 2,
+                        "bandwidthPriority": 1,
+                        "trackerStats": [
+                          {
+                            "id": 1,
+                            "host": "tracker.example",
+                            "seederCount": 12,
+                            "leecherCount": 4
+                          }
+                        ],
                         "error": 0,
                         "errorString": ""
                       }
@@ -100,6 +112,18 @@ struct TransmissionRPCClientTests {
 
         #expect(list.torrents.single?.id == 7)
         #expect(list.torrents.single?.status == .download)
+        #expect(list.torrents.single?.leftUntilDone == 1024)
+        #expect(list.torrents.single?.uploadRatio == 0.75)
+        #expect(list.torrents.single?.seedCount == 12)
+        #expect(list.torrents.single?.peerCount == 4)
+        #expect(list.torrents.single?.bandwidthPriority == .high)
+
+        let body = try #require(MockURLProtocol.requestBodies.single.flatMap { $0 })
+        let request = try JSONDecoder().decode(TorrentGetRequest.self, from: body)
+        #expect(request.arguments.fields.contains("leftUntilDone"))
+        #expect(request.arguments.fields.contains("trackerStats"))
+        #expect(request.arguments.fields.contains("uploadRatio"))
+        #expect(request.arguments.fields.contains("bandwidthPriority"))
     }
 
     @Test
@@ -467,6 +491,15 @@ private struct TorrentAddRequest: Decodable {
     struct Arguments: Decodable {
         let filename: String?
         let metainfo: String?
+    }
+}
+
+private struct TorrentGetRequest: Decodable {
+    let method: String
+    let arguments: Arguments
+
+    struct Arguments: Decodable {
+        let fields: [String]
     }
 }
 
