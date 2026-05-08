@@ -185,31 +185,6 @@ struct ContentView: View {
                 .help("Remove selected torrent")
                 .disabled(!appModel.canRunTorrentCommand)
             }
-
-            ToolbarItem(placement: .status) {
-                ConnectionStatusView(state: appModel.connectionState)
-            }
-        }
-    }
-}
-
-private struct ConnectionStatusView: View {
-    let state: ConnectionState
-
-    var body: some View {
-        switch state {
-        case .disconnected:
-            Label("Disconnected", systemImage: "bolt.slash")
-                .foregroundStyle(.secondary)
-        case .connecting:
-            Label("Connecting", systemImage: "arrow.triangle.2.circlepath")
-                .foregroundStyle(.secondary)
-        case .connected(let serverName):
-            Label(serverName, systemImage: "checkmark.circle")
-                .foregroundStyle(.green)
-        case .failed:
-            Label("Connection failed", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.red)
         }
     }
 }

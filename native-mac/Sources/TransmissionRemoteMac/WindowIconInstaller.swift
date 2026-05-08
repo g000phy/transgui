@@ -26,6 +26,6 @@ struct WindowIconInstaller: NSViewRepresentable {
         NSApplication.shared.applicationIconImage = icon
         view.window?.miniwindowImage = icon
         view.window?.representedURL = nil
+        view.window?.tabbingMode = .disallowed
     }
 }
-

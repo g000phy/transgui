@@ -6,6 +6,7 @@ struct TransmissionRemoteMacApp: App {
     @State private var appModel = AppModel()
 
     init() {
+        NSWindow.allowsAutomaticWindowTabbing = false
         AppIcon.install()
     }
 

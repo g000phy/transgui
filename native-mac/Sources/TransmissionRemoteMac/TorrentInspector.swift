@@ -9,26 +9,26 @@ struct TorrentInspector: View {
     var body: some View {
         Group {
             if let torrent {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        TorrentOverviewView(torrent: torrent, details: details, isLoading: isLoading)
-
-                        InspectorSection("Files") {
-                            TorrentFilesView(details: details)
-                                .frame(minHeight: 220)
+                TabView {
+                    TorrentOverviewView(torrent: torrent, details: details, isLoading: isLoading)
+                        .tabItem {
+                            Label("Info", systemImage: "info.circle")
                         }
 
-                        InspectorSection("Trackers") {
-                            TorrentTrackersView(details: details)
-                                .frame(minHeight: 160)
+                    TorrentFilesView(details: details)
+                        .tabItem {
+                            Label("Files", systemImage: "doc.on.doc")
                         }
 
-                        InspectorSection("Peers") {
-                            TorrentPeersView(details: details)
-                                .frame(minHeight: 180)
+                    TorrentTrackersView(details: details)
+                        .tabItem {
+                            Label("Trackers", systemImage: "antenna.radiowaves.left.and.right")
                         }
-                    }
-                    .padding()
+
+                    TorrentPeersView(details: details)
+                        .tabItem {
+                            Label("Peers", systemImage: "person.2")
+                        }
                 }
                 .navigationTitle("Details")
             } else {
@@ -46,41 +46,37 @@ private struct TorrentOverviewView: View {
     let isLoading: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            InspectorSection("Overview") {
-                VStack(alignment: .leading, spacing: 10) {
-                    LabeledContent("Name", value: torrent.name)
-                    LabeledContent("Status", value: torrent.status.displayName)
-                    LabeledContent("Progress", value: torrent.percentDone.formatted(.percent.precision(.fractionLength(0))))
-                    LabeledContent("Size", value: ByteFormat.fileSize(torrent.totalSize))
+        Form {
+            Section("Overview") {
+                LabeledContent("Name", value: torrent.name)
+                LabeledContent("Status", value: torrent.status.displayName)
+                LabeledContent("Progress", value: torrent.percentDone.formatted(.percent.precision(.fractionLength(0))))
+                LabeledContent("Size", value: ByteFormat.fileSize(torrent.totalSize))
 
-                    if let downloadDir = details?.downloadDir {
-                        LabeledContent("Location", value: downloadDir)
-                    }
+                if let downloadDir = details?.downloadDir {
+                    LabeledContent("Location", value: downloadDir)
+                }
 
-                    if let leftUntilDone = details?.leftUntilDone {
-                        LabeledContent("Remaining", value: ByteFormat.fileSize(leftUntilDone))
-                    }
+                if let leftUntilDone = details?.leftUntilDone {
+                    LabeledContent("Remaining", value: ByteFormat.fileSize(leftUntilDone))
                 }
             }
 
-            InspectorSection("Transfer") {
-                VStack(alignment: .leading, spacing: 10) {
-                    LabeledContent("Download", value: ByteFormat.transferRate(torrent.rateDownload))
-                    LabeledContent("Upload", value: ByteFormat.transferRate(torrent.rateUpload))
+            Section("Transfer") {
+                LabeledContent("Download", value: ByteFormat.transferRate(torrent.rateDownload))
+                LabeledContent("Upload", value: ByteFormat.transferRate(torrent.rateUpload))
 
-                    if let downloadedEver = details?.downloadedEver {
-                        LabeledContent("Downloaded", value: ByteFormat.fileSize(downloadedEver))
-                    }
+                if let downloadedEver = details?.downloadedEver {
+                    LabeledContent("Downloaded", value: ByteFormat.fileSize(downloadedEver))
+                }
 
-                    if let uploadedEver = details?.uploadedEver {
-                        LabeledContent("Uploaded", value: ByteFormat.fileSize(uploadedEver))
-                    }
+                if let uploadedEver = details?.uploadedEver {
+                    LabeledContent("Uploaded", value: ByteFormat.fileSize(uploadedEver))
                 }
             }
 
             if let details {
-                InspectorSection("Priority") {
+                Section("Priority") {
                     Picker("Bandwidth", selection: priorityBinding(for: details)) {
                         ForEach(BandwidthPriority.allCases) { priority in
                             Text(priority.title)
@@ -90,35 +86,35 @@ private struct TorrentOverviewView: View {
                     .pickerStyle(.segmented)
                 }
 
-                InspectorSection("Peer Summary") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        LabeledContent("Connected", value: (details.peersConnected ?? 0).formatted())
-                        LabeledContent("Downloading from us", value: (details.peersGettingFromUs ?? 0).formatted())
-                        LabeledContent("Uploading to us", value: (details.peersSendingToUs ?? 0).formatted())
-                    }
+                Section("Peers") {
+                    LabeledContent("Connected", value: (details.peersConnected ?? 0).formatted())
+                    LabeledContent("Downloading from us", value: (details.peersGettingFromUs ?? 0).formatted())
+                    LabeledContent("Uploading to us", value: (details.peersSendingToUs ?? 0).formatted())
                 }
 
-                InspectorSection("Dates") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if let addedDate = details.addedDate {
-                            LabeledContent("Added", value: DateFormat.timestamp(addedDate))
-                        }
+                Section("Dates") {
+                    if let addedDate = details.addedDate {
+                        LabeledContent("Added", value: DateFormat.timestamp(addedDate))
+                    }
 
-                        if let activityDate = details.activityDate {
-                            LabeledContent("Last activity", value: DateFormat.timestamp(activityDate))
-                        }
+                    if let activityDate = details.activityDate {
+                        LabeledContent("Last activity", value: DateFormat.timestamp(activityDate))
+                    }
 
-                        if let dateCreated = details.dateCreated, dateCreated > 0 {
-                            LabeledContent("Created", value: DateFormat.timestamp(dateCreated))
-                        }
+                    if let dateCreated = details.dateCreated, dateCreated > 0 {
+                        LabeledContent("Created", value: DateFormat.timestamp(dateCreated))
                     }
                 }
             }
 
             if isLoading {
-                ProgressView()
+                Section {
+                    ProgressView()
+                }
             }
         }
+        .formStyle(.grouped)
+        .padding()
     }
 
     private func priorityBinding(for details: TorrentDetails) -> Binding<BandwidthPriority> {
@@ -132,28 +128,6 @@ private struct TorrentOverviewView: View {
                 }
             }
         )
-    }
-}
-
-private struct InspectorSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
-
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-
-            content
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
-        }
     }
 }
 

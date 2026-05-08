@@ -162,8 +162,16 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+clean_bundle_xattrs() {
+  xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+  xattr -c "$APP_BUNDLE" 2>/dev/null || true
+  xattr -d "com.apple.FinderInfo" "$APP_BUNDLE" 2>/dev/null || true
+  xattr -d "com.apple.fileprovider.fpfs#P" "$APP_BUNDLE" 2>/dev/null || true
+}
+
+clean_bundle_xattrs
 codesign --force --sign - "$APP_BUNDLE" >/dev/null
+clean_bundle_xattrs
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
