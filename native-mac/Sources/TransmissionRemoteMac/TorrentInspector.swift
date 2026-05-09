@@ -26,7 +26,6 @@ struct TorrentInspector: View {
                     selectedContent(for: torrent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .navigationTitle("Details")
             } else {
                 ContentUnavailableView("No Torrent Selected", systemImage: "tray")
             }

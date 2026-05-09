@@ -20,32 +20,37 @@ struct ContentView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: .infinity)
-        } content: {
-            TorrentTable(
-                torrents: appModel.visibleTorrents,
-                selectedTorrentID: $appModel.selectedTorrentID,
-                canRunTorrentCommand: appModel.isConnected,
-                start: { id in Task { await appModel.startTorrent(id: id) } },
-                forceStart: { id in Task { await appModel.forceStartTorrent(id: id) } },
-                stop: { id in Task { await appModel.stopTorrent(id: id) } },
-                remove: { id, deleteLocalData in
-                    appModel.requestRemoveTorrent(id: id, deleteLocalData: deleteLocalData)
-                },
-                setPriority: { id, priority in
-                    Task { await appModel.setTorrentPriority(id: id, priority: priority) }
-                },
-                reannounce: { id in Task { await appModel.reannounceTorrent(id: id) } },
-                verify: { id in Task { await appModel.verifyTorrent(id: id) } }
-            )
-            .navigationTitle(appModel.selectedFilter.title)
-            .navigationSplitViewColumnWidth(min: 640, ideal: 1_040, max: .infinity)
         } detail: {
-            TorrentInspector(
-                torrent: appModel.selectedTorrent,
-                details: appModel.selectedTorrentDetails,
-                isLoading: appModel.isLoadingTorrentDetails
-            )
-                .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 560)
+            VSplitView {
+                TorrentTable(
+                    torrents: appModel.visibleTorrents,
+                    selectedTorrentID: $appModel.selectedTorrentID,
+                    canRunTorrentCommand: appModel.isConnected,
+                    start: { id in Task { await appModel.startTorrent(id: id) } },
+                    forceStart: { id in Task { await appModel.forceStartTorrent(id: id) } },
+                    stop: { id in Task { await appModel.stopTorrent(id: id) } },
+                    remove: { id, deleteLocalData in
+                        appModel.requestRemoveTorrent(id: id, deleteLocalData: deleteLocalData)
+                    },
+                    setPriority: { id, priority in
+                        Task { await appModel.setTorrentPriority(id: id, priority: priority) }
+                    },
+                    reannounce: { id in Task { await appModel.reannounceTorrent(id: id) } },
+                    verify: { id in Task { await appModel.verifyTorrent(id: id) } }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minHeight: 260)
+
+                TorrentInspector(
+                    torrent: appModel.selectedTorrent,
+                    details: appModel.selectedTorrentDetails,
+                    isLoading: appModel.isLoadingTorrentDetails
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minHeight: 220, idealHeight: 320)
+            }
+            .navigationTitle(appModel.selectedFilter.title)
+            .navigationSplitViewColumnWidth(min: 760, ideal: 1_240, max: .infinity)
         }
         .task(id: appModel.selectedTorrentID) {
             await appModel.loadSelectedTorrentDetails()
