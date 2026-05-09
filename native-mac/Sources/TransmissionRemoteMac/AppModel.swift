@@ -61,7 +61,7 @@ final class AppModel {
     }
 
     var canRunTorrentCommand: Bool {
-        rpcClient != nil && selectedTorrentID != nil
+        isConnected && selectedTorrentID != nil
     }
 
     var hasSavedConnection: Bool {
@@ -84,7 +84,7 @@ final class AppModel {
     }
 
     func connectToSavedProfileIfAvailable() async {
-        guard hasSavedConnection, !isConnected else {
+        guard hasSavedConnection, connectionProfile.automaticallyConnect, !isConnected else {
             return
         }
 
@@ -116,7 +116,8 @@ final class AppModel {
 
         let profile = ConnectionProfile(
             rpcURLString: draft.rpcURLString,
-            username: draft.username
+            username: draft.username,
+            automaticallyConnect: draft.automaticallyConnect
         )
 
         connectionState = .connecting

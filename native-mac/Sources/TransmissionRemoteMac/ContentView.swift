@@ -125,7 +125,7 @@ struct ContentView: View {
                 Button {
                     appModel.isConnectionSettingsPresented = true
                 } label: {
-                    Label("Connect", systemImage: "network")
+                    ConnectionToolbarLabel(state: appModel.connectionState)
                 }
                 .help("Configure Transmission connection")
             }
@@ -197,6 +197,65 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(AppModel())
+}
+
+private struct ConnectionToolbarLabel: View {
+    let state: ConnectionState
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Image(systemName: "network")
+                .font(.title3)
+                .frame(width: 24, height: 24)
+
+            Image(systemName: badgeSystemImage)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(badgeColor)
+                .background(.background, in: Circle())
+                .offset(x: 2, y: 2)
+        }
+        .accessibilityLabel("Connection")
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var badgeSystemImage: String {
+        switch state {
+        case .connected:
+            "checkmark.circle.fill"
+        case .failed:
+            "xmark.circle.fill"
+        case .connecting:
+            "ellipsis.circle.fill"
+        case .disconnected:
+            "circle.fill"
+        }
+    }
+
+    private var badgeColor: Color {
+        switch state {
+        case .connected:
+            .green
+        case .failed:
+            .red
+        case .connecting:
+            .secondary
+        case .disconnected:
+            .secondary
+        }
+    }
+
+    private var accessibilityValue: String {
+        switch state {
+        case .connected(let serverName):
+            "Connected to \(serverName)"
+        case .failed(let message):
+            "Connection error: \(message)"
+        case .connecting:
+            "Connecting"
+        case .disconnected:
+            "Disconnected"
+        }
+    }
 }
 
 private extension UTType {

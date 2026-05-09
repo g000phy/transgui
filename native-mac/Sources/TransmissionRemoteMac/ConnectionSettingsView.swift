@@ -23,6 +23,8 @@ struct ConnectionSettingsView: View {
 
                     SecureField("Password", text: $draft.password)
                         .textContentType(.password)
+
+                    Toggle("Connect automatically on launch", isOn: $draft.automaticallyConnect)
                 }
 
                 if case .failed(let message) = appModel.connectionState {
